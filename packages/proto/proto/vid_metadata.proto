@@ -1,0 +1,80 @@
+syntax = "proto3";
+
+package vidmetadata;
+
+service VidMetadata {
+  rpc CreateVideo (CreateVideoRequest) returns (CreateVideoResponse);
+  rpc UpdateVideoStatus (UpdateVideoStatusRequest) returns (UpdateVideoStatusResponse);
+  rpc GetVideo (GetVideoRequest) returns (GetVideoResponse);
+  rpc ListUserVideos (ListUserVideosRequest) returns (ListUserVideosResponse);
+  rpc CreateVideoFile (CreateVideoFileRequest) returns (CreateVideoFileResponse);
+}
+
+message CreateVideoRequest {
+  string user_id = 1;
+  string title = 2;
+  string original_resolution = 3;
+  int32 duration = 4;
+}
+
+message CreateVideoResponse {
+  string video_id = 1;
+}
+
+message UpdateVideoStatusRequest {
+  string video_id = 1;
+  string status = 2;
+  string error_message = 3;
+}
+
+message UpdateVideoStatusResponse {
+  bool success = 1;
+}
+
+message GetVideoRequest {
+  string video_id = 1;
+}
+
+message VideoFile {
+  string id = 1;
+  string format = 2;
+  string s3_key = 3;
+  int64 file_size = 4;
+}
+
+message Video {
+  string id = 1;
+  string user_id = 2;
+  string title = 3;
+  string status = 4;
+  string error_message = 5;
+  string original_resolution = 6;
+  int32 duration = 7;
+  string created_at = 8;
+  string updated_at = 9;
+  string completed_at = 10;
+  repeated VideoFile files = 11;
+}
+
+message GetVideoResponse {
+  Video video = 1;
+}
+
+message ListUserVideosRequest {
+  string user_id = 1;
+}
+
+message ListUserVideosResponse {
+  repeated Video videos = 1;
+}
+
+message CreateVideoFileRequest {
+  string video_id = 1;
+  string format = 2;
+  string s3_key = 3;
+  int64 file_size = 4;
+}
+
+message CreateVideoFileResponse {
+  string file_id = 1;
+}
