@@ -1,9 +1,11 @@
 import * as grpc from '@grpc/grpc-js';
 import { createServer } from './server.js';
+import { registerGrpcServer } from './lib/prisma.js';
 
 const PORT = process.env.GRPC_PORT ?? '50051';
 
 const server = createServer();
+registerGrpcServer(server);
 
 server.bindAsync(
   `0.0.0.0:${PORT}`,
@@ -13,6 +15,6 @@ server.bindAsync(
       console.error('Failed to bind server:', err);
       process.exit(1);
     }
-    console.log(`metadata-service gRPC server listening on port ${port}`);
+    console.log(`vidmetadata-service gRPC server listening on port ${port}`);
   }
 );

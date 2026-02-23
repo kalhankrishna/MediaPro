@@ -9,7 +9,7 @@ const adapter = new PrismaPg({
 const globalForPrisma = global as unknown as {prisma: PrismaClient};
 
 export const prisma = globalForPrisma.prisma || new PrismaClient({ 
-    log: process.env.NODE_ENV === 'development' ? ['query', 'error', 'warn'] : ['error'], 
+    log: process.env.NODE_ENV === 'development' ? ['query', 'error', 'warn'] : ['error'],
     adapter 
 });
 
@@ -32,9 +32,7 @@ async function gracefulShutdown(signal: string) {
   const forceShutdownTimer = setTimeout(() => {
     if (!shutdownComplete) {
       console.error('Graceful shutdown timeout, forcing shutdown');
-      if (grpcServer) {
-        grpcServer.forceShutdown();
-      }
+      if (grpcServer) grpcServer.forceShutdown();
       process.exit(1);
     }
   }, 10000);
@@ -60,10 +58,6 @@ async function gracefulShutdown(signal: string) {
         }
     });
 
-    // Disconnect Prisma
-    await prisma.$disconnect();
-    console.log('Prisma disconnected successfully');
-
     shutdownComplete = true;
     clearTimeout(forceShutdownTimer);
     console.log('Graceful shutdown complete');
@@ -79,14 +73,3 @@ async function gracefulShutdown(signal: string) {
 // Register shutdown handlers
 process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
 process.on('SIGINT', () => gracefulShutdown('SIGINT'));
-
-// Handle uncaught errors
-process.on('uncaughtException', (error) => {
-  console.error('Uncaught exception:', error);
-  gracefulShutdown('uncaughtException');
-});
-
-process.on('unhandledRejection', (reason, promise) => {
-  console.error('Unhandled rejection at:', promise, 'reason:', reason);
-  gracefulShutdown('unhandledRejection');
-});

@@ -3,7 +3,7 @@ modules:
   - path: proto
 breaking:
   use:
-    - FILE
+    - WIRE
 lint:
   use:
     - STANDARD

@@ -5,3 +5,4 @@ plugins:
     opt:
       - outputServices=grpc-js
       - esModuleInterop=true
+      - forceLong=bigint
