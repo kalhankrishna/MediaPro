@@ -2,18 +2,43 @@ import type { VidMetadataServer } from '@mediapro/proto';
 
 export const vidMetadataHandlers: VidMetadataServer = {
   createVideo: (call, callback) => {
-    // TODO
+    try{
+      
+    }
+    catch(err){
+      callback(err as Error, null);
+    }
   },
   updateVideoStatus: (call, callback) => {
-    // TODO
+    try{
+
+    }
+    catch(err){
+      callback(err as Error, null);
+    }
   },
   getVideo: (call, callback) => {
-    // TODO
+    try{
+
+    }
+    catch(err){
+      callback(err as Error, null);
+    }
   },
   listUserVideos: (call, callback) => {
-    // TODO
+    try{
+
+    }
+    catch(err){
+      callback(err as Error, null);
+    }
   },
   createVideoFile: (call, callback) => {
-    // TODO
+    try{
+
+    }
+    catch(err){
+      callback(err as Error, null);
+    }
   },
 };

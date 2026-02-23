@@ -1,0 +1,72 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  name      String?
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  
+  videos    Video[]
+  
+  @@map("users")
+}
+
+model Video {
+  id                  String      @id @default(uuid())
+  userId              String      @map("user_id")
+  title               String
+  status              VideoStatus @default(UPLOADED)
+  errorMessage        String?     @map("error_message")
+  originalResolution  String      @map("original_resolution")
+  duration            Int         // seconds
+  createdAt           DateTime    @default(now()) @map("created_at")
+  updatedAt           DateTime    @updatedAt @map("updated_at")
+  completedAt         DateTime?   @map("completed_at")
+  
+  user                User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  files               VideoFile[]
+  
+  @@map("videos")
+}
+
+model VideoFile {
+  id        String     @id @default(uuid())
+  videoId   String     @map("video_id")
+  format    FileFormat
+  s3Key     String     @map("s3_key")
+  fileSize  BigInt     @map("file_size") // bytes
+  createdAt DateTime   @default(now()) @map("created_at")
+  
+  video     Video      @relation(fields: [videoId], references: [id], onDelete: Cascade)
+  
+  @@map("video_files")
+}
+
+enum VideoStatus {
+  UPLOADED
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+enum FileFormat {
+  RAW
+  FORMAT_480P  @map("480p")
+  FORMAT_720P  @map("720p")
+  FORMAT_1080P @map("1080p")
+  THUMBNAIL
+}
