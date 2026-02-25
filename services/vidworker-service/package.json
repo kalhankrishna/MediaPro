@@ -1,0 +1,29 @@
+{
+  "name": "@mediapro/vidworker-service",
+  "version": "1.0.0",
+  "description": "",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "packageManager": "pnpm@10.30.0",
+  "devDependencies": {
+    "@tsconfig/node-lts": "^24.0.0",
+    "@types/node": "^25.3.0",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3"
+  },
+  "dependencies": {
+    "@mediapro/proto": "workspace:*",
+    "@mediapro/queue": "workspace:*",
+    "@aws-sdk/client-s3": "^3.997.0",
+    "@grpc/grpc-js": "^1.14.3",
+    "bullmq": "^5.70.1"
+  }
+}
