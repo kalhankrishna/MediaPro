@@ -1,6 +1,7 @@
 import { status as GrpcStatus } from "@grpc/grpc-js";
 import type { VidMetadataServer } from '@mediapro/proto';
 import { prisma } from "../lib/prisma.js";
+import { Prisma } from "../generated/prisma/client.js";
 import { mapVideoStatusToPrisma, mapFileFormatToPrisma, mapVideoStatusToProto, mapFileFormatToProto } from '../lib/enumMappers.js';
 
 export const vidMetadataHandlers: VidMetadataServer = {
@@ -153,6 +154,21 @@ export const vidMetadataHandlers: VidMetadataServer = {
       callback(null, { fileId: file.id });
     }
     catch(err){
+      if (
+        err instanceof Prisma.PrismaClientKnownRequestError &&
+        err.code === 'P2002'
+      ) {
+        const existing = await prisma.videoFile.findUnique({
+          where: { videoId_format: { videoId: call.request.videoId, format: mapFileFormatToPrisma(call.request.format) } },
+          select: { id: true },
+        });
+
+        if (existing) {
+          callback(null, { fileId: existing.id });
+          return;
+        }
+      }
+
       callback({
         code: GrpcStatus.INTERNAL,
         message: (err as Error).message,
