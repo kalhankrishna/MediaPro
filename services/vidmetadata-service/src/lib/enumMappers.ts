@@ -18,6 +18,7 @@ export function mapFileFormatToPrisma(format: ProtoFileFormat): FileFormat {
         case ProtoFileFormat.FILE_FORMAT_720P: return FileFormat.FORMAT_720P;
         case ProtoFileFormat.FILE_FORMAT_1080P: return FileFormat.FORMAT_1080P;
         case ProtoFileFormat.FILE_FORMAT_THUMBNAIL: return FileFormat.THUMBNAIL;
+        case ProtoFileFormat.FILE_FORMAT_POSTER: return FileFormat.POSTER;
         default: throw new Error(`Unknown FileFormat: ${format}`);
     }
 }
@@ -39,6 +40,7 @@ export function mapFileFormatToProto(format: FileFormat): ProtoFileFormat {
         case FileFormat.FORMAT_720P: return ProtoFileFormat.FILE_FORMAT_720P;
         case FileFormat.FORMAT_1080P: return ProtoFileFormat.FILE_FORMAT_1080P;
         case FileFormat.THUMBNAIL: return ProtoFileFormat.FILE_FORMAT_THUMBNAIL;
+        case FileFormat.POSTER: return ProtoFileFormat.FILE_FORMAT_POSTER;
         default: throw new Error(`Unknown FileFormat: ${format}`);
     }
 }

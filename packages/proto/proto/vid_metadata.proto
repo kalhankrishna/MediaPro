@@ -19,6 +19,7 @@ enum FileFormat {
   FILE_FORMAT_720P = 3;
   FILE_FORMAT_1080P = 4;
   FILE_FORMAT_THUMBNAIL = 5;
+  FILE_FORMAT_POSTER = 6;
 }
 
 service VidMetadata {
@@ -27,6 +28,8 @@ service VidMetadata {
   rpc GetVideo (GetVideoRequest) returns (GetVideoResponse);
   rpc ListUserVideos (ListUserVideosRequest) returns (ListUserVideosResponse);
   rpc CreateVideoFile (CreateVideoFileRequest) returns (CreateVideoFileResponse);
+  rpc CreateTranscript (CreateTranscriptRequest) returns (CreateTranscriptResponse);
+  rpc GetTranscript (GetTranscriptRequest) returns (GetTranscriptResponse);
 }
 
 message CreateVideoRequest {
@@ -61,6 +64,7 @@ message VideoFile {
   string s3_key = 3;
   int64 file_size = 4;
   FileFormat format = 5;
+  google.protobuf.Timestamp created_at = 6;
 }
 
 message Video {
@@ -100,4 +104,28 @@ message CreateVideoFileRequest {
 
 message CreateVideoFileResponse {
   string file_id = 1;
+}
+
+message VideoTranscript {
+  string id = 1;
+  string video_id = 2;
+  string content = 3;
+  google.protobuf.Timestamp created_at = 4;
+}
+
+message CreateTranscriptRequest {
+  string video_id = 1;
+  string content = 2;
+}
+
+message CreateTranscriptResponse {
+  string transcript_id = 1;
+}
+
+message GetTranscriptRequest {
+  string video_id = 1;
+}
+
+message GetTranscriptResponse {
+  VideoTranscript transcript = 1;
 }

@@ -175,4 +175,59 @@ export const vidMetadataHandlers: VidMetadataServer = {
       }, null);
     }
   },
+
+  createTranscript: async (call, callback) => {
+    try {
+      const { videoId, content } = call.request;
+
+      const transcript = await prisma.videoTranscript.create({
+        data: { videoId, content },
+      });
+
+      callback(null, { transcriptId: transcript.id });
+    } catch (err) {
+      if (
+        err instanceof Prisma.PrismaClientKnownRequestError &&
+        err.code === 'P2002'
+      ) {
+        const existing = await prisma.videoTranscript.findUnique({
+          where: { videoId: call.request.videoId },
+          select: { id: true },
+        });
+        if (existing) {
+          callback(null, { transcriptId: existing.id });
+          return;
+        }
+      }
+      callback({ code: GrpcStatus.INTERNAL, message: (err as Error).message }, null);
+    }
+  },
+
+  getTranscript: async (call, callback) => {
+    try {
+      const { videoId } = call.request;
+
+      const transcript = await prisma.videoTranscript.findUnique({
+        where: { videoId },
+      });
+
+      if (!transcript) {
+        return callback({
+          code: GrpcStatus.NOT_FOUND,
+          message: `Transcript for video ${videoId} not found`,
+        }, null);
+      }
+
+      callback(null, {
+        transcript: {
+          id: transcript.id,
+          videoId: transcript.videoId,
+          content: transcript.content,
+          createdAt: transcript.createdAt,
+        },
+      });
+    } catch (err) {
+      callback({ code: GrpcStatus.INTERNAL, message: (err as Error).message }, null);
+    }
+  },
 };

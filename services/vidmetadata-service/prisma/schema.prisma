@@ -39,6 +39,7 @@ model Video {
   
   user                User        @relation(fields: [userId], references: [id], onDelete: Cascade)
   files               VideoFile[]
+  transcript          VideoTranscript?
   
   @@map("videos")
 }
@@ -57,6 +58,17 @@ model VideoFile {
   @@map("video_files")
 }
 
+model VideoTranscript {
+  id        String   @id @default(uuid())
+  videoId   String   @unique @map("video_id")
+  content   String
+  createdAt DateTime @default(now()) @map("created_at")
+
+  video     Video    @relation(fields: [videoId], references: [id], onDelete: Cascade)
+
+  @@map("video_transcripts")
+}
+
 enum VideoStatus {
   UPLOADED
   PROCESSING
@@ -70,4 +82,5 @@ enum FileFormat {
   FORMAT_720P  @map("720p")
   FORMAT_1080P @map("1080p")
   THUMBNAIL
+  POSTER
 }
