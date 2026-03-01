@@ -5,9 +5,13 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "tsx watch --env-file=.env src/index.ts",
+    "dev:video": "tsx watch --env-file=.env src/entries/video.ts",
+    "dev:transcript": "tsx watch --env-file=.env src/entries/transcript.ts",
+    "dev:embedding": "tsx watch --env-file=.env src/entries/embedding.ts",
     "build": "tsc",
-    "start": "node dist/index.js"
+    "start:video": "node dist/entries/video.js",
+    "start:transcript": "node dist/entries/transcript.js",
+    "start:embedding": "node dist/entries/embedding.js"
   },
   "keywords": [],
   "author": "",
@@ -20,7 +24,8 @@
     "typescript": "^5.9.3"
   },
   "dependencies": {
-    "@aws-sdk/client-s3": "^3.997.0",
+    "@aws-sdk/client-s3": "^3.1000.0",
+    "@aws-sdk/lib-storage": "^3.1000.0",
     "@grpc/grpc-js": "^1.14.3",
     "@mediapro/proto": "workspace:*",
     "@mediapro/queue": "workspace:*",

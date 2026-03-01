@@ -6,3 +6,4 @@ plugins:
       - outputServices=grpc-js
       - esModuleInterop=true
       - forceLong=bigint
+      - importSuffix=.js

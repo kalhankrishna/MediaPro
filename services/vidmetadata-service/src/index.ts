@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import * as grpc from '@grpc/grpc-js';
 import { createServer } from './server.js';
 import { registerGrpcServer } from './lib/prisma.js';
