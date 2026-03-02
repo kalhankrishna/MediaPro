@@ -30,6 +30,7 @@
     "@mediapro/proto": "workspace:*",
     "@mediapro/queue": "workspace:*",
     "bullmq": "^5.70.1",
+    "groq-sdk": "^0.37.0",
     "ioredis": "^5.9.3"
   }
 }

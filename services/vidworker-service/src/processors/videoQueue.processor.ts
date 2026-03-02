@@ -6,7 +6,7 @@ import { createReadStream, createWriteStream } from 'node:fs';
 import path from 'node:path';
 import { Readable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
-import { GetObjectCommand } from '@aws-sdk/client-s3';
+import { GetObjectCommand, HeadObjectCommand } from '@aws-sdk/client-s3';
 import { Upload } from '@aws-sdk/lib-storage';
 import { s3, S3_BUCKET } from '../lib/s3Client.js';
 import { updateVideoStatus, createVideoFile } from '../lib/vidMetadataService.js';
@@ -65,6 +65,37 @@ function transcode(inputPath: string, outputPath: string, height: number): Promi
   });
 }
 
+function extractPosterFrame(inputPath: string, outputPath: string): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const proc = spawn('ffmpeg', [
+      '-ss', '00:00:05',
+      '-i', inputPath,
+      '-vframes', '1',
+      '-q:v', '2',
+      '-y', outputPath,
+    ], { stdio: ['ignore', 'ignore', 'pipe'] });
+
+    const timeout = setTimeout(() => {
+      proc.kill('SIGKILL');
+      reject(new Error('ffmpeg frame extraction timed out'));
+    }, 60_000);
+
+    let stderr = '';
+    proc.stderr.on('data', (chunk) => {
+      stderr += chunk.toString();
+      if (stderr.length > 50_000) stderr = stderr.slice(-50_000);
+    });
+
+    proc.on('close', (code) => {
+      clearTimeout(timeout);
+      if (code === 0) resolve();
+      else reject(new Error(`ffmpeg frame extraction exited with code ${code}: ${stderr.slice(-500)}`));
+    });
+
+    proc.on('error', (err) => { clearTimeout(timeout); reject(err); });
+  });
+}
+
 export async function videoQueueProcessor(job: Job<VideoProcessingJob>): Promise<void> {
   const { videoId, rawS3Key } = job.data;
 
@@ -84,6 +115,27 @@ export async function videoQueueProcessor(job: Job<VideoProcessingJob>): Promise
   try{
     await updateVideoStatus({ videoId, status: VideoStatus.VIDEO_STATUS_PROCESSING });
     await job.updateProgress(5);
+
+    // Check if already processed
+    const alreadyProcessed = await Promise.all(
+      RESOLUTIONS.map(async (resolution) => {
+        const s3Key = `processed/${videoId}/${resolution.name}.mp4`;
+        try {
+          await s3.send(new HeadObjectCommand({ Bucket: S3_BUCKET, Key: s3Key }));
+          return true;
+        } catch {
+          return false;
+        }
+      })
+    );
+
+    if (alreadyProcessed.every(Boolean)) {
+      console.log(`[${job.id}] All resolutions already processed, skipping transcode.`);
+      const processed720pKey = `processed/${videoId}/720p.mp4`;
+      await transcriptQueue.add('transcribe', { videoId, processedS3Key: processed720pKey });
+      await job.updateProgress(100);
+      return;
+    }
 
     console.log(`[${job.id}] Downloading ${rawS3Key} from S3...`);
     const s3Object = await s3.send(new GetObjectCommand({ Bucket: S3_BUCKET, Key: rawS3Key }));
@@ -125,15 +177,35 @@ export async function videoQueueProcessor(job: Job<VideoProcessingJob>): Promise
       await job.updateProgress(progressMap[resolution.name]);
     }
 
-    await updateVideoStatus({ videoId, status: VideoStatus.VIDEO_STATUS_COMPLETED });
+    const posterFramePath = path.join(jobTempDir, 'poster-frame.jpg');
+    await extractPosterFrame(rawFilePath, posterFramePath);
+
+    await new Upload({
+      client: s3,
+      params: {
+        Bucket: S3_BUCKET,
+        Key: `raw/${videoId}/poster-frame.jpg`,
+        Body: createReadStream(posterFramePath),
+        ContentType: 'image/jpeg',
+      },
+    }).done();
     await job.updateProgress(90);
 
-
     if(processed720pKey){
-      await transcriptQueue.add('transcribe', {
-        videoId,
-        processedS3Key: processed720pKey,
-      });
+      await transcriptQueue.add(
+        'transcribe', 
+        {
+          videoId,
+          processedS3Key: processed720pKey,
+        },
+        {
+          attempts: 3,
+          backoff: {
+            type: 'exponential',
+            delay: 5000,
+          },
+        },
+      );
     }
 
     await job.updateProgress(100);
