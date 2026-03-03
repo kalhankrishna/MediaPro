@@ -17,4 +17,5 @@ export interface TranscriptionJob {
 export interface EmbeddingJob {
   videoId: string;
   transcriptId: string;
+  transcriptText: string;
 }

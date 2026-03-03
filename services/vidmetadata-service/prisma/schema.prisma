@@ -6,11 +6,13 @@
 
 generator client {
   provider = "prisma-client"
+  previewFeatures = ["postgresqlExtensions"]
   output   = "../src/generated/prisma"
 }
 
 datasource db {
   provider = "postgresql"
+  extensions = [vector]
 }
 
 model User {
@@ -69,9 +71,26 @@ model VideoTranscript {
   @@map("video_transcripts")
 }
 
+model VideoEmbedding {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  videoId      String
+  transcriptId String
+  chunkIndex   Int
+  chunkText    String
+  embedding    Unsupported("vector(1024)")
+  startChar    Int?
+  endChar      Int?
+  createdAt    DateTime @default(now()) @db.Timestamptz
+
+  @@index([videoId])
+  @@index([transcriptId])
+}
+
 enum VideoStatus {
   UPLOADED
   PROCESSING
+  TRANSCRIBING
+  EMBEDDING
   COMPLETED
   FAILED
 }

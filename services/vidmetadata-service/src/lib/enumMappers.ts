@@ -5,6 +5,8 @@ export function mapVideoStatusToPrisma(status: ProtoVideoStatus): VideoStatus {
     switch(status){
         case ProtoVideoStatus.VIDEO_STATUS_UPLOADED: return VideoStatus.UPLOADED;
         case ProtoVideoStatus.VIDEO_STATUS_PROCESSING: return VideoStatus.PROCESSING;
+        case ProtoVideoStatus.VIDEO_STATUS_TRANSCRIBING: return VideoStatus.TRANSCRIBING;
+        case ProtoVideoStatus.VIDEO_STATUS_EMBEDDING: return VideoStatus.EMBEDDING;
         case ProtoVideoStatus.VIDEO_STATUS_COMPLETED: return VideoStatus.COMPLETED;
         case ProtoVideoStatus.VIDEO_STATUS_FAILED: return VideoStatus.FAILED;
         default: throw new Error(`Unknown VideoStatus: ${status}`);
@@ -27,6 +29,8 @@ export function mapVideoStatusToProto(status: VideoStatus): ProtoVideoStatus {
     switch(status){
         case VideoStatus.UPLOADED: return ProtoVideoStatus.VIDEO_STATUS_UPLOADED;
         case VideoStatus.PROCESSING: return ProtoVideoStatus.VIDEO_STATUS_PROCESSING;
+        case VideoStatus.TRANSCRIBING: return ProtoVideoStatus.VIDEO_STATUS_TRANSCRIBING;
+        case VideoStatus.EMBEDDING: return ProtoVideoStatus.VIDEO_STATUS_EMBEDDING;
         case VideoStatus.COMPLETED: return ProtoVideoStatus.VIDEO_STATUS_COMPLETED;
         case VideoStatus.FAILED: return ProtoVideoStatus.VIDEO_STATUS_FAILED;
         default: throw new Error(`Unknown VideoStatus: ${status}`);

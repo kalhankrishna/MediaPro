@@ -1,5 +1,6 @@
 import { Job, Queue } from "bullmq";
 import { redisConnection } from "../config/redis.js";
+import os from 'node:os';
 import { spawn } from "node:child_process";
 import { mkdir, rm } from "node:fs/promises";
 import { createReadStream, createWriteStream } from "node:fs";
@@ -21,7 +22,7 @@ const embeddingQueue = new Queue<EmbeddingJob>(QUEUES.EMBEDDING, {
   connection: redisConnection,
 });
 
-const TEMP_DIR = "/tmp/mediapro";
+const TEMP_DIR = path.join(os.tmpdir(), 'mediapro');
 
 function extractAudio(inputPath: string, outputPath: string): Promise<void> {
     return new Promise((resolve, reject) => {
@@ -98,12 +99,21 @@ export async function transcriptQueueProcessor(job: Job<TranscriptionJob>) {
         const { transcriptId } = await createTranscript({ videoId, content });
         await job.updateProgress(85);
 
-        await embeddingQueue.add('embed', {
-            videoId,
-            transcriptId,
-        });
-
-        await updateVideoStatus({ videoId, status: VideoStatus.VIDEO_STATUS_COMPLETED });
+        await embeddingQueue.add(
+            'embed', 
+            {
+                videoId,
+                transcriptId,
+                transcriptText: content,
+            },
+            {
+                attempts: 3,
+                backoff: {
+                    type: 'exponential',
+                    delay: 5000,
+                },
+            },
+        );
 
         await job.updateProgress(100);
         console.log(`[${job.id}] Transcription complete.`);

@@ -1,5 +1,6 @@
 import { Job, Queue } from 'bullmq';
 import { redisConnection } from '../config/redis.js';
+import os from 'node:os';
 import { spawn } from 'node:child_process';
 import { mkdir, rm, stat } from 'node:fs/promises';
 import { createReadStream, createWriteStream } from 'node:fs';
@@ -17,7 +18,7 @@ const transcriptQueue = new Queue(QUEUES.TRANSCRIPTION, {
   connection: redisConnection,
 });
 
-const TEMP_DIR = '/tmp/mediapro';
+const TEMP_DIR = path.join(os.tmpdir(), 'mediapro');
 
 const RESOLUTIONS = [
   { name: '480p',  height: 480,  format: FileFormat.FILE_FORMAT_480P  },
@@ -184,12 +185,13 @@ export async function videoQueueProcessor(job: Job<VideoProcessingJob>): Promise
       client: s3,
       params: {
         Bucket: S3_BUCKET,
-        Key: `raw/${videoId}/poster-frame.jpg`,
+        Key: `assets/${videoId}/poster-frame.jpg`,
         Body: createReadStream(posterFramePath),
         ContentType: 'image/jpeg',
       },
     }).done();
     await job.updateProgress(90);
+    console.log(`[${job.id}] Poster frame uploaded: assets/${videoId}/poster-frame.jpg`);
 
     if(processed720pKey){
       await transcriptQueue.add(
