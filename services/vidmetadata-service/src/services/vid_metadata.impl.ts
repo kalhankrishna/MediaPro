@@ -230,4 +230,135 @@ export const vidMetadataHandlers: VidMetadataServer = {
       callback({ code: GrpcStatus.INTERNAL, message: (err as Error).message }, null);
     }
   },
+
+  upsertUser: async (call, callback) => {
+    try {
+      const { email, name, avatarUrl, provider, providerAccountId } = call.request;
+
+      const user = await prisma.user.upsert({
+        where: {
+          provider_providerAccountId: { provider, providerAccountId },
+        },
+        create: {
+          email,
+          name: name ?? null,
+          avatarUrl: avatarUrl ?? null,
+          provider,
+          providerAccountId,
+        },
+        update: {
+          email,
+          name: name ?? undefined,
+          avatarUrl: avatarUrl ?? undefined,
+        },
+      });
+
+      callback(null, {
+        user: {
+          id: user.id,
+          email: user.email,
+          name: user.name ?? undefined,
+          avatarUrl: user.avatarUrl ?? undefined,
+          provider: user.provider,
+          providerAccountId: user.providerAccountId,
+          createdAt: user.createdAt,
+          updatedAt: user.updatedAt,
+        },
+      });
+    } catch (err) {
+      callback({ code: GrpcStatus.INTERNAL, message: (err as Error).message }, null);
+    }
+  },
+
+  getUserById: async (call, callback) => {
+    try {
+      const user = await prisma.user.findUnique({
+        where: { id: call.request.userId },
+      });
+
+      if (!user) {
+        return callback({ code: GrpcStatus.NOT_FOUND, message: 'User not found' }, null);
+      }
+
+      callback(null, {
+        user: {
+          id: user.id,
+          email: user.email,
+          name: user.name ?? undefined,
+          avatarUrl: user.avatarUrl ?? undefined,
+          provider: user.provider,
+          providerAccountId: user.providerAccountId,
+          createdAt: user.createdAt,
+          updatedAt: user.updatedAt,
+        },
+      });
+    } catch (err) {
+      callback({ code: GrpcStatus.INTERNAL, message: (err as Error).message }, null);
+    }
+  },
+
+  createRefreshToken: async (call, callback) => {
+    try {
+      const { userId, tokenHash, expiresAt } = call.request;
+
+      const token = await prisma.refreshToken.create({
+        data: {
+          userId,
+          tokenHash,
+          expiresAt: expiresAt!,
+        },
+      });
+
+      callback(null, { tokenId: token.id });
+    } catch (err) {
+      callback({ code: GrpcStatus.INTERNAL, message: (err as Error).message }, null);
+    }
+  },
+
+  getRefreshTokenByHash: async (call, callback) => {
+    try {
+      const token = await prisma.refreshToken.findUnique({
+        where: { tokenHash: call.request.tokenHash },
+      });
+
+      if (!token) {
+        return callback({ code: GrpcStatus.NOT_FOUND, message: 'Token not found' }, null);
+      }
+
+      callback(null, {
+        tokenId: token.id,
+        userId: token.userId,
+        expiresAt: token.expiresAt,
+      });
+    } catch (err) {
+      callback({ code: GrpcStatus.INTERNAL, message: (err as Error).message }, null);
+    }
+  },
+
+  deleteRefreshToken: async (call, callback) => {
+    try {
+      await prisma.refreshToken.delete({
+        where: { tokenHash: call.request.tokenHash },
+      });
+
+      callback(null, { success: true });
+    } catch (err) {
+      if ((err as any).code === 'P2025') {
+        return callback(null, { success: false });
+      }
+      callback({ code: GrpcStatus.INTERNAL, message: (err as Error).message }, null);
+    }
+  },
+
+  deleteAllUserRefreshTokens: async (call, callback) => {
+    try {
+      const result = await prisma.refreshToken.deleteMany({
+        where: { userId: call.request.userId },
+      });
+
+      callback(null, { deletedCount: result.count });
+    } catch (err) {
+      callback({ code: GrpcStatus.INTERNAL, message: (err as Error).message }, null);
+    }
+  },
 };

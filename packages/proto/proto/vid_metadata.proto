@@ -32,6 +32,12 @@ service VidMetadata {
   rpc CreateVideoFile (CreateVideoFileRequest) returns (CreateVideoFileResponse);
   rpc CreateTranscript (CreateTranscriptRequest) returns (CreateTranscriptResponse);
   rpc GetTranscript (GetTranscriptRequest) returns (GetTranscriptResponse);
+  rpc UpsertUser (UpsertUserRequest) returns (UpsertUserResponse);
+  rpc GetUserById (GetUserByIdRequest) returns (GetUserByIdResponse);
+  rpc CreateRefreshToken (CreateRefreshTokenRequest) returns (CreateRefreshTokenResponse);
+  rpc GetRefreshTokenByHash (GetRefreshTokenByHashRequest) returns (GetRefreshTokenByHashResponse);
+  rpc DeleteRefreshToken (DeleteRefreshTokenRequest) returns (DeleteRefreshTokenResponse);
+  rpc DeleteAllUserRefreshTokens (DeleteAllUserRefreshTokensRequest) returns (DeleteAllUserRefreshTokensResponse);
 }
 
 message CreateVideoRequest {
@@ -130,4 +136,71 @@ message GetTranscriptRequest {
 
 message GetTranscriptResponse {
   VideoTranscript transcript = 1;
+}
+
+message User {
+  string id = 1;
+  string email = 2;
+  optional string name = 3;
+  optional string avatar_url = 4;
+  string provider = 5;
+  string provider_account_id = 6;
+  google.protobuf.Timestamp created_at = 7;
+  google.protobuf.Timestamp updated_at = 8;
+}
+
+message UpsertUserRequest {
+  string email = 1;
+  optional string name = 2;
+  optional string avatar_url = 3;
+  string provider = 4;
+  string provider_account_id = 5;
+}
+
+message UpsertUserResponse {
+  User user = 1;
+}
+
+message GetUserByIdRequest {
+  string user_id = 1;
+}
+
+message GetUserByIdResponse {
+  User user = 1;
+}
+
+message CreateRefreshTokenRequest {
+  string user_id = 1;
+  string token_hash = 2;
+  google.protobuf.Timestamp expires_at = 3;
+}
+
+message CreateRefreshTokenResponse {
+  string token_id = 1;
+}
+
+message GetRefreshTokenByHashRequest {
+  string token_hash = 1;
+}
+
+message GetRefreshTokenByHashResponse {
+  string token_id = 1;
+  string user_id = 2;
+  google.protobuf.Timestamp expires_at = 3;
+}
+
+message DeleteRefreshTokenRequest {
+  string token_hash = 1;
+}
+
+message DeleteRefreshTokenResponse {
+  bool success = 1;
+}
+
+message DeleteAllUserRefreshTokensRequest {
+  string user_id = 1;
+}
+
+message DeleteAllUserRefreshTokensResponse {
+  int32 deleted_count = 1;
 }
