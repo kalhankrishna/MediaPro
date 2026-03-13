@@ -1,6 +1,7 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import express from 'express';
+import { createGatewayClient, type GatewayClient } from './lib/gatewayClient.js';
 import { registerSearchTool } from './tools/search.js';
 import { registerGetVideoTool } from './tools/getVideo.js';
 import { registerListVideosTool } from './tools/listVideos.js';
@@ -12,17 +13,17 @@ app.use(express.json());
 
 const PORT = parseInt(process.env.PORT ?? '3001', 10);
 
-function createServer(): McpServer {
+function createServer(gateway: GatewayClient): McpServer {
   const server = new McpServer({
     name: 'mediapro-mcp',
     version: '1.0.0',
   });
 
-  registerSearchTool(server);
-  registerGetVideoTool(server);
-  registerListVideosTool(server);
-  registerUploadVideoTool(server);
-  registerConfirmUploadTool(server);
+  registerSearchTool(server, gateway);
+  registerGetVideoTool(server, gateway);
+  registerListVideosTool(server, gateway);
+  registerUploadVideoTool(server, gateway);
+  registerConfirmUploadTool(server, gateway);
 
   return server;
 }
@@ -32,7 +33,10 @@ app.get('/mcp', (req, res) => {
 });
 
 app.post('/mcp', async (req, res) => {
-  const server = createServer();  // new instance per request
+  const authHeader = req.headers.authorization;
+  const gateway = createGatewayClient(authHeader);
+  const server = createServer(gateway);
+
   const transport = new StreamableHTTPServerTransport({
     sessionIdGenerator: undefined,
   });

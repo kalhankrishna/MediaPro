@@ -27,6 +27,7 @@ model User {
 
   videos            Video[]
   refreshTokens     RefreshToken[]
+  apiKeys           ApiKey[]
 
   @@unique([provider, providerAccountId])
   @@map("users")
@@ -42,6 +43,19 @@ model RefreshToken {
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("refresh_tokens")
+}
+
+model ApiKey {
+  id         String    @id @default(uuid())
+  userId     String    @map("user_id")
+  name       String
+  keyHash    String    @unique @map("key_hash")   // SHA-256
+  createdAt  DateTime  @default(now()) @map("created_at")
+  lastUsedAt DateTime? @map("last_used_at")
+
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("api_keys")
 }
 
 model Video {

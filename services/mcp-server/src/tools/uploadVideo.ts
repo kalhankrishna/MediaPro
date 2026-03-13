@@ -1,8 +1,8 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
-import { gateway } from '../lib/gatewayClient.js';
+import type { GatewayClient } from '../lib/gatewayClient.js';
 
-export function registerUploadVideoTool(server: McpServer) {
+export function registerUploadVideoTool(server: McpServer, gateway: GatewayClient) {
   server.registerTool(
     'upload_video',
     {

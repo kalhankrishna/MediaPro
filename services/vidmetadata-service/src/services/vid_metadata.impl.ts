@@ -361,4 +361,75 @@ export const vidMetadataHandlers: VidMetadataServer = {
       callback({ code: GrpcStatus.INTERNAL, message: (err as Error).message }, null);
     }
   },
+
+  createApiKey: async (call, callback) => {
+    try {
+      const { userId, name, keyHash } = call.request;
+
+      const apiKey = await prisma.apiKey.create({
+        data: { userId, name, keyHash },
+      });
+
+      callback(null, { keyId: apiKey.id });
+    } catch (err) {
+      callback({ code: GrpcStatus.INTERNAL, message: (err as Error).message }, null);
+    }
+  },
+
+  listUserApiKeys: async (call, callback) => {
+    try {
+      const keys = await prisma.apiKey.findMany({
+        where: { userId: call.request.userId },
+        select: { id: true, name: true, createdAt: true, lastUsedAt: true },
+        orderBy: { createdAt: 'desc' },
+      });
+
+      callback(null, {
+        keys: keys.map(k => ({
+          id: k.id,
+          name: k.name,
+          createdAt: k.createdAt,
+          lastUsedAt: k.lastUsedAt ?? undefined,
+        })),
+      });
+    } catch (err) {
+      callback({ code: GrpcStatus.INTERNAL, message: (err as Error).message }, null);
+    }
+  },
+
+  revokeApiKey: async (call, callback) => {
+    try {
+      const { keyId, userId } = call.request;
+
+      const deleted = await prisma.apiKey.deleteMany({
+        where: { id: keyId, userId },
+      });
+
+      callback(null, { success: deleted.count > 0 });
+    } catch (err) {
+      callback({ code: GrpcStatus.INTERNAL, message: (err as Error).message }, null);
+    }
+  },
+
+  getApiKeyByHash: async (call, callback) => {
+    try {
+      const apiKey = await prisma.apiKey.findUnique({
+        where: { keyHash: call.request.keyHash },
+      });
+
+      if (!apiKey) {
+        return callback({ code: GrpcStatus.NOT_FOUND, message: 'API key not found' }, null);
+      }
+
+      // Update lastUsedAt — fire and forget
+      prisma.apiKey.update({
+        where: { id: apiKey.id },
+        data: { lastUsedAt: new Date() },
+      }).catch(() => {});
+
+      callback(null, { keyId: apiKey.id, userId: apiKey.userId });
+    } catch (err) {
+      callback({ code: GrpcStatus.INTERNAL, message: (err as Error).message }, null);
+    }
+  },
 };

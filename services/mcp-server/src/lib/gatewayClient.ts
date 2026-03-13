@@ -1,50 +1,67 @@
 const GATEWAY_URL = process.env.GATEWAY_URL;
 if (!GATEWAY_URL) throw new Error('GATEWAY_URL is not defined');
 
-async function gatewayFetch<T>(path: string, options?: RequestInit): Promise<T> {
-  const response = await fetch(`${GATEWAY_URL}${path}`, {
-    ...options,
-    headers: {
-      'Content-Type': 'application/json',
-      ...options?.headers,
-    },
-  });
-
-  if (!response.ok) {
-    const error = await response.text();
-    throw new Error(`Gateway error ${response.status}: ${error}`);
-  }
-
-  return response.json() as Promise<T>;
+export interface GatewayClient {
+  search: (query: string) => Promise<{ answer: string; sources: any[] }>;
+  getVideo: (videoId: string) => Promise<{ id: string; title: string; status: string; files: any[] }>;
+  listVideos: (userId: string) => Promise<{ videos: any[] }>;
+  createVideo: (payload: { userId: string; title: string; originalResolution: string; duration: number }) => Promise<{ videoId: string }>;
+  getUploadUrl: (videoId: string, contentType: string) => Promise<{ url: string; key: string }>;
+  confirmUpload: (videoId: string) => Promise<{ message: string }>;
 }
 
-export const gateway = {
-  search: (query: string) =>
-    gatewayFetch<{ answer: string; sources: any[] }>('/search', {
-      method: 'POST',
-      body: JSON.stringify({ query }),
-    }),
+export function createGatewayClient(authHeader?: string): GatewayClient {
+  async function gatewayFetch<T>(path: string, options?: RequestInit): Promise<T> {
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+      ...(options?.headers as Record<string, string>),
+    };
 
-  getVideo: (videoId: string) =>
-    gatewayFetch<{ id: string; title: string; status: string; files: any[] }>(`/videos/${videoId}`),
+    if (authHeader) {
+      headers['Authorization'] = authHeader;
+    }
 
-  listVideos: (userId: string) =>
-    gatewayFetch<{ videos: any[] }>(`/videos?userId=${userId}`),
+    const response = await fetch(`${GATEWAY_URL}${path}`, {
+      ...options,
+      headers,
+    });
 
-  createVideo: (payload: { userId: string; title: string; originalResolution: string; duration: number }) =>
-    gatewayFetch<{ videoId: string }>('/videos', {
-      method: 'POST',
-      body: JSON.stringify(payload),
-    }),
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`Gateway error ${response.status}: ${error}`);
+    }
 
-  getUploadUrl: (videoId: string, contentType: string) =>
-    gatewayFetch<{ url: string; key: string }>(`/videos/${videoId}/upload-url`, {
-      method: 'POST',
-      body: JSON.stringify({ contentType }),
-    }),
+    return response.json() as Promise<T>;
+  }
 
-  confirmUpload: (videoId: string) =>
-    gatewayFetch<{ message: string }>(`/videos/${videoId}/confirm`, {
-      method: 'POST',
-    }),
-};
+  return {
+    search: (query) =>
+      gatewayFetch('/search', {
+        method: 'POST',
+        body: JSON.stringify({ query }),
+      }),
+
+    getVideo: (videoId) =>
+      gatewayFetch(`/videos/${videoId}`),
+
+    listVideos: (userId) =>
+      gatewayFetch(`/videos?userId=${userId}`),
+
+    createVideo: (payload) =>
+      gatewayFetch('/videos', {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      }),
+
+    getUploadUrl: (videoId, contentType) =>
+      gatewayFetch(`/videos/${videoId}/upload-url`, {
+        method: 'POST',
+        body: JSON.stringify({ contentType }),
+      }),
+
+    confirmUpload: (videoId) =>
+      gatewayFetch(`/videos/${videoId}/confirm`, {
+        method: 'POST',
+      }),
+  };
+}

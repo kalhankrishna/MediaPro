@@ -38,6 +38,10 @@ service VidMetadata {
   rpc GetRefreshTokenByHash (GetRefreshTokenByHashRequest) returns (GetRefreshTokenByHashResponse);
   rpc DeleteRefreshToken (DeleteRefreshTokenRequest) returns (DeleteRefreshTokenResponse);
   rpc DeleteAllUserRefreshTokens (DeleteAllUserRefreshTokensRequest) returns (DeleteAllUserRefreshTokensResponse);
+  rpc CreateApiKey (CreateApiKeyRequest) returns (CreateApiKeyResponse);
+  rpc ListUserApiKeys (ListUserApiKeysRequest) returns (ListUserApiKeysResponse);
+  rpc RevokeApiKey (RevokeApiKeyRequest) returns (RevokeApiKeyResponse);
+  rpc GetApiKeyByHash (GetApiKeyByHashRequest) returns (GetApiKeyByHashResponse);
 }
 
 message CreateVideoRequest {
@@ -203,4 +207,47 @@ message DeleteAllUserRefreshTokensRequest {
 
 message DeleteAllUserRefreshTokensResponse {
   int32 deleted_count = 1;
+}
+
+message CreateApiKeyRequest {
+  string user_id = 1;
+  string name = 2;
+  string key_hash = 3;
+}
+
+message CreateApiKeyResponse {
+  string key_id = 1;
+}
+
+message ApiKeyInfo {
+  string id = 1;
+  string name = 2;
+  google.protobuf.Timestamp created_at = 3;
+  google.protobuf.Timestamp last_used_at = 4;
+}
+
+message ListUserApiKeysRequest {
+  string user_id = 1;
+}
+
+message ListUserApiKeysResponse {
+  repeated ApiKeyInfo keys = 1;
+}
+
+message RevokeApiKeyRequest {
+  string key_id = 1;
+  string user_id = 2;
+}
+
+message RevokeApiKeyResponse {
+  bool success = 1;
+}
+
+message GetApiKeyByHashRequest {
+  string key_hash = 1;
+}
+
+message GetApiKeyByHashResponse {
+  string key_id = 1;
+  string user_id = 2;
 }
