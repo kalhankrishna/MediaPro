@@ -459,6 +459,8 @@ POST /auth/logout           → SHA-256 cookie value → delete from DB → clea
 
 **GitHub authorization is persistent** — user clicks "Authorize" once, subsequent logins skip consent screen. GitHub access token is used once in callback (fetch profile), never stored.
 
+**Error handling:** OAuth callback errors redirect to `FRONTEND_URL/login?error=<code>` (not JSON) — codes: `oauth_failed`, `session_expired`, `csrf`, `no_email`, `server_error`. Success redirects to `FRONTEND_URL/dashboard`.
+
 **gRPC RPCs (vidmetadata-service):** UpsertUser (composite unique on provider+providerAccountId), GetUserById, CreateRefreshToken, GetRefreshTokenByHash, DeleteRefreshToken, DeleteAllUserRefreshTokens.
 
 ### Phase 7b — Agent Auth (API Keys)
@@ -504,7 +506,7 @@ DELETE /api-keys/:id  → revoke (ownership-checked via userId)
 - `cache: 'no-store'` on all gateway fetches — auth-gated data should not be cached at edge.
 
 **Auth in frontend:**
-- `middleware.ts` checks `access_token` cookie existence, redirects to `/login` if missing. Does NOT validate JWT (Edge runtime can't use jsonwebtoken).
+- `proxy.ts` checks `access_token` cookie existence, redirects to `/login` if missing. Does NOT validate JWT (Edge runtime can't use jsonwebtoken). `/api/auth/*` is bypassed to allow unauthenticated OAuth initiation.
 - Actual validation happens when Server Component calls Gateway — 401 response triggers redirect.
 - No token management in client JS — cookies sent automatically.
 - No TanStack Query — Server Components + `router.refresh()` handle data lifecycle.
@@ -651,7 +653,7 @@ P2002 (unique constraint) caught and handled — returns existing fileId. Handle
 
 | Item | Status |
 |---|---|
-| Phase 6 Next.js frontend | 🚧 In progress — scaffold + middleware + gateway wrapper done |
+| Phase 6 Next.js frontend | 🚧 In progress — landing (/), login (/login), OAuth end-to-end complete; dashboard + remaining pages queued |
 | Phase 8a Security hardening + logging/monitoring | ⬜ Queued |
 | Phase 8b Hetzner deployment (Caddy, PM2, GitHub Actions) | ⬜ Queued |
 | Phase 8c AWS Lambda thumbnail generator | ⬜ Queued (after 8b — Lambda needs public Gateway URL) |
