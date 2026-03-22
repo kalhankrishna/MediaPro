@@ -61,24 +61,28 @@ router.get('/github/callback', asyncHandler(async (req, res) => {
   const { code, state } = req.query as { code?: string; state?: string };
 
   if (!code || !state) {
-    res.status(400).json({ error: 'Missing code or state' });
+    res.redirect(`${FRONTEND_URL}/login?error=oauth_failed`);
     return;
   }
 
   // Validate PKCE cookie
   const pkceCookie = req.signedCookies?.pkce;
   if (!pkceCookie) {
-    res.status(400).json({ error: 'Missing PKCE cookie — try logging in again' });
+    res.redirect(`${FRONTEND_URL}/login?error=session_expired`);
     return;
   }
 
-  const { verifier, state: storedState } = JSON.parse(pkceCookie) as {
-    verifier: string;
-    state: string;
-  };
+  let verifier: string, storedState: string;
+  try {
+    ({ verifier, state: storedState } = JSON.parse(pkceCookie) as { verifier: string; state: string });
+  } catch {
+    res.redirect(`${FRONTEND_URL}/login?error=session_expired`);
+    return;
+  }
 
   if (state !== storedState) {
-    res.status(400).json({ error: 'State mismatch — possible CSRF' });
+    res.clearCookie('pkce', { ...COOKIE_BASE, signed: true });
+    res.redirect(`${FRONTEND_URL}/login?error=csrf`);
     return;
   }
 
@@ -106,9 +110,7 @@ router.get('/github/callback', asyncHandler(async (req, res) => {
   };
 
   if (!tokenData.access_token) {
-    res.status(401).json({
-      error: tokenData.error_description ?? tokenData.error ?? 'GitHub token exchange failed',
-    });
+    res.redirect(`${FRONTEND_URL}/login?error=oauth_failed`);
     return;
   }
 
@@ -137,11 +139,11 @@ router.get('/github/callback', asyncHandler(async (req, res) => {
       primary: boolean;
       verified: boolean;
     }[];
-    email = emails.find(e => e.primary && e.verified)?.email ?? emails[0]?.email ?? null;
+    email = emails.find(e => e.primary && e.verified)?.email ?? emails.find(e => e.verified)?.email ?? null;
   }
 
   if (!email) {
-    res.status(400).json({ error: 'No email found on GitHub account' });
+    res.redirect(`${FRONTEND_URL}/login?error=no_email`);
     return;
   }
 
@@ -156,7 +158,7 @@ router.get('/github/callback', asyncHandler(async (req, res) => {
   });
 
   if (!user) {
-    res.status(500).json({ error: 'User upsert failed' });
+    res.redirect(`${FRONTEND_URL}/login?error=server_error`);
     return;
   }
 
@@ -182,7 +184,7 @@ router.get('/github/callback', asyncHandler(async (req, res) => {
     maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
   });
 
-  res.redirect(FRONTEND_URL);
+  res.redirect(`${FRONTEND_URL}/dashboard`);
 }));
 
 // ─── POST /auth/refresh ───
