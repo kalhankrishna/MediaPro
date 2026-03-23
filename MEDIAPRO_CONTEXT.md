@@ -514,6 +514,29 @@ DELETE /api-keys/:id  → revoke (ownership-checked via userId)
 
 **Pages:** Landing (SSR/SEO), Login, Dashboard (video list + polling), Video Detail, Upload, Search, API Keys.
 
+**Completed pages:**
+- `/` — Landing page. Server Component. Redirects to `/dashboard` if `access_token` cookie present.
+- `/login` — Server Component. Reads `?error` search param, maps to user-facing message. CTA: `<a href="/api/auth/github">` → kicks off OAuth.
+- `/dashboard` — Server Component shell + `<VideoList>` Client Component.
+  - JWT decode pattern: `Buffer.from(token.split('.')[1], 'base64url')` — no verification, gateway validates on every call. Guarded with explicit `userId`/`email` presence check before use.
+  - Fetches initial videos server-side; passes to `VideoList` as `initialVideos`.
+  - 401 from gateway → redirect to `/login?error=session_expired`.
+
+**Dashboard polling pattern:**
+- `VideoList.tsx` (`'use client'`) polls `/api/videos?userId=X` every 3 seconds.
+- `useEffect` deps: `[videos, tick, userId, router]`. On success: `setVideos(fresh)` triggers next cycle. On network error: `setTick(t => t + 1)` keeps polling alive.
+- Stops when all videos have terminal status (3 = COMPLETED, 4 = FAILED).
+- `aria-live="polite"` announces polling to screen readers. Polling dot in fixed-size slot — no layout shift.
+
+**API routes (Next.js Route Handlers):**
+- `GET /api/auth/github` → 307 redirect to `GATEWAY_URL/auth/github`. Keeps `GATEWAY_URL` server-side.
+- `POST /api/auth/logout` → best-effort POST to gateway (invalidates refresh token), clears `access_token` cookie, redirects to `/login`.
+- `GET /api/videos?userId=X` → proxies to `GATEWAY_URL/videos?userId=X` with cookie forwarding. Used for client-side polling (keeps `GATEWAY_URL` out of browser bundle). Returns 503 on gateway unreachable.
+
+**Shared types:** `lib/types.ts` exports `Video` and `VideoFile` interfaces matching the proto-decoded REST shape. Status is numeric (proto enum: 1=UPLOADED, 2=PROCESSING, 3=COMPLETED, 4=FAILED, 5=TRANSCRIBING, 6=EMBEDDING). Terminal = 3 or 4.
+
+**Import convention in Next.js app layer:** No `.js` extensions on relative/alias imports — Turbopack resolves `.ts` files transparently. The `.js` extension rule applies only to services and packages (Node.js ESM / nodenext resolution).
+
 ---
 
 ## BullMQ Job Types
@@ -653,7 +676,7 @@ P2002 (unique constraint) caught and handled — returns existing fileId. Handle
 
 | Item | Status |
 |---|---|
-| Phase 6 Next.js frontend | 🚧 In progress — landing (/), login (/login), OAuth end-to-end complete; dashboard + remaining pages queued |
+| Phase 6 Next.js frontend | 🚧 In progress — landing (/), login (/login), OAuth end-to-end, dashboard (/dashboard) complete; upload, video detail, search, API keys queued |
 | Phase 8a Security hardening + logging/monitoring | ⬜ Queued |
 | Phase 8b Hetzner deployment (Caddy, PM2, GitHub Actions) | ⬜ Queued |
 | Phase 8c AWS Lambda thumbnail generator | ⬜ Queued (after 8b — Lambda needs public Gateway URL) |
