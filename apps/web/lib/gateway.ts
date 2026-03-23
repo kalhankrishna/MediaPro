@@ -63,6 +63,11 @@ export const gateway = {
       method: 'POST',
     }),
 
+  deleteVideo: (videoId: string) =>
+    gatewayFetch<{ message: string }>(`/videos/${videoId}`, {
+      method: 'DELETE',
+    }),
+
   // Search
   search: (query: string) =>
     gatewayFetch<{ answer: string; sources: any[] }>('/search', {

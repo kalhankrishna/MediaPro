@@ -2,22 +2,17 @@ import type { Metadata } from 'next';
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
-import { gateway, GatewayError } from '@/lib/gateway';
-import type { Video } from '@/lib/types';
-import VideoList from './VideoList';
+import UploadForm from './UploadForm';
 
 export const metadata: Metadata = {
-  title: 'Dashboard — MediaPro',
+  title: 'Upload — MediaPro',
 };
 
-export default async function DashboardPage() {
+export default async function UploadPage() {
   const cookieStore = await cookies();
   const token = cookieStore.get('access_token')?.value;
   if (!token) redirect('/login');
 
-  // Decode JWT payload — no verification needed, gateway validates on every request.
-  // try/catch is scoped to JSON.parse only; redirect() throws NEXT_REDIRECT internally
-  // and must not be called inside a catch block or it will be swallowed and re-thrown.
   let decoded: { userId?: unknown; email?: unknown };
   try {
     const [, p] = token.split('.');
@@ -29,20 +24,8 @@ export default async function DashboardPage() {
   const userId = decoded!.userId as string;
   const email = decoded!.email as string;
 
-  let initialVideos: Video[] = [];
-  try {
-    const { videos } = await gateway.listVideos(userId!);
-    initialVideos = videos;
-  } catch (err) {
-    if (err instanceof GatewayError && err.status === 401) {
-      redirect('/login?error=session_expired');
-    }
-    // Other errors: render with empty list, client will retry via polling
-  }
-
   return (
     <div className="min-h-screen bg-background text-white flex flex-col">
-      {/* Top bar */}
       <header className="h-11 border-b border-zinc-800/70 px-6 flex items-center justify-between shrink-0">
         <Link
           href="/dashboard"
@@ -63,9 +46,8 @@ export default async function DashboardPage() {
         </div>
       </header>
 
-      {/* Content */}
       <main className="flex-1 px-4 sm:px-6 pt-8 pb-6 max-w-5xl w-full mx-auto">
-        <VideoList initialVideos={initialVideos} userId={userId!} />
+        <UploadForm userId={userId!} />
       </main>
     </div>
   );

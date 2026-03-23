@@ -1,5 +1,5 @@
 # MediaPro — Architecture & Context Document
-> Last updated: 2026-03-21
+> Last updated: 2026-03-23
 > Keep this file in the repo root. Commit after every significant decision.
 
 ---
@@ -514,13 +514,14 @@ DELETE /api-keys/:id  → revoke (ownership-checked via userId)
 
 **Pages:** Landing (SSR/SEO), Login, Dashboard (video list + polling), Video Detail, Upload, Search, API Keys.
 
+**JWT decode pattern (all Server Component pages):**
+`try/catch` is scoped to `JSON.parse` only — `redirect()` throws `NEXT_REDIRECT` internally and must not be called inside a catch block or the throw is swallowed. Validation guard (`!decoded.userId || !decoded.email`) runs outside the try block. No JWT verification — gateway validates on every call.
+
 **Completed pages:**
 - `/` — Landing page. Server Component. Redirects to `/dashboard` if `access_token` cookie present.
 - `/login` — Server Component. Reads `?error` search param, maps to user-facing message. CTA: `<a href="/api/auth/github">` → kicks off OAuth.
-- `/dashboard` — Server Component shell + `<VideoList>` Client Component.
-  - JWT decode pattern: `Buffer.from(token.split('.')[1], 'base64url')` — no verification, gateway validates on every call. Guarded with explicit `userId`/`email` presence check before use.
-  - Fetches initial videos server-side; passes to `VideoList` as `initialVideos`.
-  - 401 from gateway → redirect to `/login?error=session_expired`.
+- `/dashboard` — Server Component shell + `<VideoList>` Client Component. Fetches initial videos server-side; passes to `VideoList` as `initialVideos`. 401 from gateway → redirect to `/login?error=session_expired`.
+- `/upload` — Server Component shell + `<UploadForm>` Client Component. Full upload state machine: `idle → selected → uploading → confirming → done → error`. Drag-and-drop + click-to-browse. Extracts video metadata (resolution, duration) from HTML5 `<video>` element client-side before upload. Uses `XMLHttpRequest` for direct S3 PUT (supports progress events + `.abort()`). Auto-redirects to `/dashboard` 1.8s after success.
 
 **Dashboard polling pattern:**
 - `VideoList.tsx` (`'use client'`) polls `/api/videos?userId=X` every 3 seconds.
@@ -528,10 +529,20 @@ DELETE /api-keys/:id  → revoke (ownership-checked via userId)
 - Stops when all videos have terminal status (3 = COMPLETED, 4 = FAILED).
 - `aria-live="polite"` announces polling to screen readers. Polling dot in fixed-size slot — no layout shift.
 
+**Upload flow (frontend):**
+1. Client extracts title/resolution/duration from file via HTML5 `<video>` element
+2. `POST /api/upload` (Route Handler) → `gateway.createVideo` + `gateway.getUploadUrl` → returns `{ videoId, uploadUrl }`
+3. Client XHR `PUT` directly to S3 presigned URL with progress tracking
+4. `POST /api/upload/confirm` (Route Handler) → `gateway.confirmUpload` → triggers pipeline
+5. Orphaned record cleanup: if S3 upload is cancelled or `getUploadUrl` fails, `POST /api/upload/cancel` calls `gateway.deleteVideo` (best-effort — silently ignored if gateway doesn't support DELETE yet). `videoIdRef` tracks the record until `confirmUpload` succeeds or cleanup fires.
+
 **API routes (Next.js Route Handlers):**
 - `GET /api/auth/github` → 307 redirect to `GATEWAY_URL/auth/github`. Keeps `GATEWAY_URL` server-side.
 - `POST /api/auth/logout` → best-effort POST to gateway (invalidates refresh token), clears `access_token` cookie, redirects to `/login`.
 - `GET /api/videos?userId=X` → proxies to `GATEWAY_URL/videos?userId=X` with cookie forwarding. Used for client-side polling (keeps `GATEWAY_URL` out of browser bundle). Returns 503 on gateway unreachable.
+- `POST /api/upload` → `createVideo` + `getUploadUrl`; split into separate try blocks so a `getUploadUrl` failure triggers `deleteVideo` cleanup before returning error. Validates `contentType` against server-side allowlist before calling gateway.
+- `POST /api/upload/confirm` → `confirmUpload`. Triggers BullMQ pipeline.
+- `POST /api/upload/cancel` → `deleteVideo` (best-effort, errors swallowed). Called on user cancel and on client-side upload errors.
 
 **Shared types:** `lib/types.ts` exports `Video` and `VideoFile` interfaces matching the proto-decoded REST shape. Status is numeric (proto enum: 1=UPLOADED, 2=PROCESSING, 3=COMPLETED, 4=FAILED, 5=TRANSCRIBING, 6=EMBEDDING). Terminal = 3 or 4.
 
@@ -676,7 +687,7 @@ P2002 (unique constraint) caught and handled — returns existing fileId. Handle
 
 | Item | Status |
 |---|---|
-| Phase 6 Next.js frontend | 🚧 In progress — landing (/), login (/login), OAuth end-to-end, dashboard (/dashboard) complete; upload, video detail, search, API keys queued |
+| Phase 6 Next.js frontend | 🚧 In progress — `/`, `/login`, `/dashboard`, `/upload` complete; `/videos/[id]`, `/search`, `/api-keys` queued |
 | Phase 8a Security hardening + logging/monitoring | ⬜ Queued |
 | Phase 8b Hetzner deployment (Caddy, PM2, GitHub Actions) | ⬜ Queued |
 | Phase 8c AWS Lambda thumbnail generator | ⬜ Queued (after 8b — Lambda needs public Gateway URL) |
