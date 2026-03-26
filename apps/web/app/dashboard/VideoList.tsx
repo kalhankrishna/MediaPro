@@ -111,12 +111,20 @@ export default function VideoList({
             )}
           </span>
         </div>
-        <Link
-          href="/upload"
-          className="font-mono text-[11px] text-zinc-400 hover:text-white border border-zinc-800 hover:border-zinc-700 px-3 py-2.5 sm:py-1.5 rounded transition-colors duration-100"
-        >
-          + upload
-        </Link>
+        <div className="flex items-center gap-2">
+          <Link
+            href="/search"
+            className="font-mono text-[11px] text-zinc-400 hover:text-white border border-zinc-800 hover:border-zinc-700 px-3 py-2.5 sm:py-1.5 rounded transition-colors duration-100"
+          >
+            search
+          </Link>
+          <Link
+            href="/upload"
+            className="font-mono text-[11px] text-zinc-400 hover:text-white border border-zinc-800 hover:border-zinc-700 px-3 py-2.5 sm:py-1.5 rounded transition-colors duration-100"
+          >
+            + upload
+          </Link>
+        </div>
       </div>
 
       {/* Table */}

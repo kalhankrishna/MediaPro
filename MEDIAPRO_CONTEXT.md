@@ -1,5 +1,5 @@
 # MediaPro — Architecture & Context Document
-> Last updated: 2026-03-26
+> Last updated: 2026-03-27
 > Keep this file in the repo root. Commit after every significant decision.
 
 ---
@@ -136,7 +136,7 @@ Embedding Worker completes → done, result in pgvector
 
 **Lambda handles only Sharp** — ffmpeg never touches Lambda. Video Worker extracts poster frame via ffmpeg at 5s mark, uploads to S3. Lambda resizes via Sharp on S3 upload events.
 
-**RAG = retrieval only, no generation** — LangChain used purely as plumbing (TextSplitter). Search endpoint embeds query → pgvector similarity → returns ranked results with transcript snippets and timestamps. No LLM synthesizes an answer.
+**RAG = retrieval + LLM answer generation** — LangChain used purely as plumbing (TextSplitter). Search endpoint: embed query (Voyage AI) → pgvector cosine similarity top 6 chunks → Groq llama-3.1-8b-instant synthesizes a concise answer citing sources → return `{ answer, sources }`.
 
 **MCP Server is stateless and provider-agnostic** — new McpServer instance per request. Per-request gateway client with auth header baked in. Wraps Gateway via typed fetch. Any agent runtime works.
 
@@ -171,11 +171,12 @@ Embedding Worker completes → done, result in pgvector
 4. Response: gRPC → REST → Browser
 
 ### Search Flow
-1. Browser → Gateway `POST /search`
-2. Gateway → Voyage AI embed query
-3. Gateway → pgvector similarity search (`<=>` cosine)
-4. Returns ranked video results + transcript snippets + timestamps
-5. No LLM call. No generation.
+1. Browser → `POST /api/search` (Next.js Route Handler proxy)
+2. Route Handler → Gateway `POST /search` with cookie forwarding
+3. Gateway → Voyage AI embed query (`input_type: 'query'`)
+4. Gateway → pgvector cosine similarity search (`<=>`) → top 6 chunks
+5. Gateway → Groq llama-3.1-8b-instant → synthesized answer citing sources
+6. Returns `{ answer: string, sources: [{ videoId, chunkText, similarity, ... }] }`
 
 ### MCP Flow (Agent)
 1. MCP client → `POST /mcp` on MCP Server with `Authorization: Bearer mp_...`
@@ -523,6 +524,7 @@ DELETE /api-keys/:id  → revoke (ownership-checked via userId)
 - `/dashboard` — Server Component shell + `<VideoList>` Client Component. Fetches initial videos server-side; passes to `VideoList` as `initialVideos`. 401 from gateway → redirect to `/login?error=session_expired`.
 - `/upload` — Server Component shell + `<UploadForm>` Client Component. Full upload state machine: `idle → selected → uploading → confirming → done → error`. Drag-and-drop + click-to-browse. Extracts video metadata (resolution, duration) from HTML5 `<video>` element client-side before upload. Uses `XMLHttpRequest` for direct S3 PUT (supports progress events + `.abort()`). Auto-redirects to `/dashboard` 1.8s after success.
 - `/videos/[id]` — Server Component shell + `<VideoDetail>` Client Component. Status polling (tick-bump pattern, stops at terminal). Native `<video controls>` player loads presigned GET URL client-side. Transcript fetched server-side as initial prop; client re-fetches when pipeline reaches COMPLETED. WebVTT captions generated from Groq segment timestamps (per-line sync); falls back to single-cue if segments unavailable.
+- `/search` — Server Component shell + `<SearchForm>` Client Component. Submits query to `POST /api/search` → gateway → Voyage AI embed → pgvector cosine similarity → Groq llama answer generation. Displays AI-generated answer block above ranked source excerpts. Each source links to `/videos/[id]`. Relevance badges use a 4-level enum (exact ≥0.85 emerald, strong ≥0.70 sky, partial ≥0.55 zinc, weak <0.55 red) mapping to `.impeccable.md` color conventions. Entry point: "search" button in dashboard `VideoList` header.
 
 **Dashboard polling pattern:**
 - `VideoList.tsx` (`'use client'`) polls `/api/videos?userId=X` every 3 seconds.
@@ -563,6 +565,7 @@ DELETE /api-keys/:id  → revoke (ownership-checked via userId)
 - `POST /api/upload` → `createVideo` + `getUploadUrl`; split into separate try blocks so a `getUploadUrl` failure triggers `deleteVideo` cleanup before returning error. Validates `contentType` against server-side allowlist before calling gateway.
 - `POST /api/upload/confirm` → `confirmUpload`. Triggers BullMQ pipeline.
 - `POST /api/upload/cancel` → `deleteVideo` (best-effort, errors swallowed). Called on user cancel and on client-side upload errors.
+- `POST /api/search` → proxies to `GATEWAY_URL/search` with cookie forwarding. Validates query is non-empty before forwarding.
 
 **Shared types:** `lib/types.ts` exports `Video` and `VideoFile` interfaces matching the proto-decoded REST shape. Status is numeric (proto enum: 1=UPLOADED, 2=PROCESSING, 3=COMPLETED, 4=FAILED, 5=TRANSCRIBING, 6=EMBEDDING). Terminal = 3 or 4.
 
@@ -707,7 +710,7 @@ P2002 (unique constraint) caught and handled — returns existing fileId. Handle
 
 | Item | Status |
 |---|---|
-| Phase 6 Next.js frontend | 🚧 In progress — `/`, `/login`, `/dashboard`, `/upload`, `/videos/[id]` complete; `/search`, `/api-keys` queued |
+| Phase 6 Next.js frontend | 🚧 In progress — `/`, `/login`, `/dashboard`, `/upload`, `/videos/[id]`, `/search` complete; `/api-keys` queued |
 | Phase 8a Security hardening + logging/monitoring | ⬜ Queued |
 | Phase 8b Hetzner deployment (Caddy, PM2, GitHub Actions) | ⬜ Queued |
 | Phase 8c AWS Lambda thumbnail generator | ⬜ Queued (after 8b — Lambda needs public Gateway URL) |
