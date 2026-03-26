@@ -45,9 +45,11 @@ export default async function VideoPage({
   // Transcript fetched server-side — it's static once written, no need to poll.
   // 404 means pipeline hasn't completed yet; that's fine.
   let initialTranscript: string | null = null;
+  let initialSegmentsJson: string | null = null;
   try {
     const t = await gateway.getTranscript(id);
     initialTranscript = t.content;
+    initialSegmentsJson = t.segmentsJson ?? null;
   } catch (err) {
     // 404 = not yet generated; swallow and render without transcript.
     // 5xx = gateway/gRPC problem; also swallow — transcript is optional.
@@ -81,6 +83,7 @@ export default async function VideoPage({
         <VideoDetail
           initialVideo={video}
           initialTranscript={initialTranscript}
+          initialSegmentsJson={initialSegmentsJson}
         />
       </main>
     </div>

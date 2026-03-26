@@ -48,16 +48,31 @@ function bestStreamFile(video: Video) {
   return streamable[0] ?? null;
 }
 
-// Generates a single-cue WebVTT blob covering the full video duration.
-// Not timestamped, but satisfies WCAG 1.2.2 by making transcript content
-// available as a caption track.
-function buildVttUrl(text: string, durationSeconds: number): string {
-  const d = durationSeconds || 86400;
-  const h = String(Math.floor(d / 3600)).padStart(2, '0');
-  const m = String(Math.floor((d % 3600) / 60)).padStart(2, '0');
-  const s = String(Math.floor(d % 60)).padStart(2, '0');
-  const vtt = `WEBVTT\n\n00:00:00.000 --> ${h}:${m}:${s}.000\n${text}`;
-  return URL.createObjectURL(new Blob([vtt], { type: 'text/vtt' }));
+interface Segment { start: number; end: number; text: string; }
+
+function toVttTime(seconds: number): string {
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  const s = seconds % 60;
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${s.toFixed(3).padStart(6, '0')}`;
+}
+
+// Builds a WebVTT blob URL. Uses real Groq segment timestamps when available
+// (accurate per-line sync), falls back to a single cue covering the full duration.
+function buildVttUrl(text: string, durationSeconds: number, segmentsJson?: string | null): string {
+  if (segmentsJson) {
+    try {
+      const segments: Segment[] = JSON.parse(segmentsJson);
+      if (segments.length > 0) {
+        const cues = segments
+          .map(seg => `${toVttTime(seg.start)} --> ${toVttTime(seg.end)}\n${seg.text.trim()}`)
+          .join('\n\n');
+        return URL.createObjectURL(new Blob([`WEBVTT\n\n${cues}`], { type: 'text/vtt' }));
+      }
+    } catch { /* fall through to single-cue */ }
+  }
+  const end = toVttTime(durationSeconds || 86400);
+  return URL.createObjectURL(new Blob([`WEBVTT\n\n00:00:00.000 --> ${end}\n${text}`], { type: 'text/vtt' }));
 }
 
 // ─── Sub-components ───
@@ -83,11 +98,13 @@ function VideoPlayer({
   videoId,
   s3Key,
   transcript,
+  segmentsJson,
   duration,
 }: {
   videoId: string;
   s3Key: string;
   transcript: string | null;
+  segmentsJson: string | null;
   duration: number;
 }) {
   const [src, setSrc] = useState<string | null>(null);
@@ -95,13 +112,13 @@ function VideoPlayer({
   const [vttUrl, setVttUrl] = useState<string | null>(null);
   const [statusMsg, setStatusMsg] = useState('');
 
-  // Build VTT caption blob from transcript when available
+  // Build VTT caption blob — uses real segment timestamps when available
   useEffect(() => {
     if (!transcript) return;
-    const url = buildVttUrl(transcript, duration);
+    const url = buildVttUrl(transcript, duration, segmentsJson);
     setVttUrl(url);
     return () => URL.revokeObjectURL(url);
-  }, [transcript, duration]);
+  }, [transcript, segmentsJson, duration]);
 
   // Fetch presigned stream URL
   useEffect(() => {
@@ -159,13 +176,16 @@ function VideoPlayer({
 export default function VideoDetail({
   initialVideo,
   initialTranscript,
+  initialSegmentsJson,
 }: {
   initialVideo: Video;
   initialTranscript: string | null;
+  initialSegmentsJson: string | null;
 }) {
   const router = useRouter();
   const [video, setVideo] = useState<Video>(initialVideo);
   const [transcript, setTranscript] = useState<string | null>(initialTranscript);
+  const [segmentsJson, setSegmentsJson] = useState<string | null>(initialSegmentsJson);
   const [tick, setTick] = useState(0);
   const [isPolling, setIsPolling] = useState(false);
   const transcriptFetchedRef = useRef(initialTranscript !== null);
@@ -209,8 +229,9 @@ export default function VideoDetail({
         cache: 'no-store',
       });
       if (res.ok) {
-        const data = (await res.json()) as { content: string | null };
+        const data = (await res.json()) as { content: string | null; segmentsJson?: string | null };
         setTranscript(data.content);
+        setSegmentsJson(data.segmentsJson ?? null);
       }
     } catch { /* transcript is optional — ignore errors */ }
   }, [video.id]);
@@ -259,6 +280,7 @@ export default function VideoDetail({
             videoId={video.id}
             s3Key={streamFile.s3Key}
             transcript={transcript}
+            segmentsJson={segmentsJson}
             duration={video.duration}
           />
         </div>

@@ -92,12 +92,13 @@ model VideoFile {
 }
 
 model VideoTranscript {
-  id        String   @id @default(uuid())
-  videoId   String   @unique @map("video_id")
-  content   String
-  createdAt DateTime @default(now()) @map("created_at")
+  id            String   @id @default(uuid())
+  videoId       String   @unique @map("video_id")
+  content       String
+  segmentsJson  String   @map("segments_json")
+  createdAt     DateTime @default(now()) @map("created_at")
 
-  video     Video    @relation(fields: [videoId], references: [id], onDelete: Cascade)
+  video         Video    @relation(fields: [videoId], references: [id], onDelete: Cascade)
 
   @@map("video_transcripts")
 }

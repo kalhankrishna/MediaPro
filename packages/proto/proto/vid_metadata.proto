@@ -122,12 +122,14 @@ message VideoTranscript {
   string id = 1;
   string video_id = 2;
   string content = 3;
+  string segments_json = 5;
   google.protobuf.Timestamp created_at = 4;
 }
 
 message CreateTranscriptRequest {
   string video_id = 1;
   string content = 2;
+  string segments_json = 3;
 }
 
 message CreateTranscriptResponse {

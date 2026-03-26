@@ -88,15 +88,16 @@ export async function transcriptQueueProcessor(job: Job<TranscriptionJob>) {
         const transcription = await groq.audio.transcriptions.create({
             file: createReadStream(audioPath),
             model: 'whisper-large-v3',
-            response_format: 'text',
+            response_format: 'verbose_json',
             // language: 'en',
-        });
+        }) as any; // Groq SDK types don't expose the verbose_json response shape
         await job.updateProgress(70);
 
-        const content = typeof transcription === 'string' ? transcription : transcription.text;
+        const content = transcription.text;
+        const segmentsJson = JSON.stringify(transcription.segments ?? []);
 
         console.log(`[${job.id}] Saving transcript...`);
-        const { transcriptId } = await createTranscript({ videoId, content });
+        const { transcriptId } = await createTranscript({ videoId, content, segmentsJson });
         await job.updateProgress(85);
 
         await embeddingQueue.add(

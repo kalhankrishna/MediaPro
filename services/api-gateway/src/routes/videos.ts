@@ -81,7 +81,7 @@ router.get('/:videoId/transcript', asyncHandler(async (req, res) => {
             res.status(404).json({ error: 'Transcript not found' });
             return;
         }
-        res.json({ content: transcript.content, createdAt: transcript.createdAt });
+        res.json({ content: transcript.content, segmentsJson: transcript.segmentsJson, createdAt: transcript.createdAt });
     } catch (err: unknown) {
         // gRPC NOT_FOUND (code 5) — transcript does not exist yet
         if ((err as { code?: number })?.code === 5) {

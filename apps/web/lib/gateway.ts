@@ -65,7 +65,7 @@ export const gateway = {
     }),
 
   getTranscript: (videoId: string) =>
-    gatewayFetch<{ content: string; createdAt: string }>(`/videos/${videoId}/transcript`),
+    gatewayFetch<{ content: string; segmentsJson?: string | null; createdAt: string }>(`/videos/${videoId}/transcript`),
 
   deleteVideo: (videoId: string) =>
     gatewayFetch<{ message: string }>(`/videos/${videoId}`, {

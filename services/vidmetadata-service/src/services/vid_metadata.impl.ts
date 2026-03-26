@@ -178,10 +178,10 @@ export const vidMetadataHandlers: VidMetadataServer = {
 
   createTranscript: async (call, callback) => {
     try {
-      const { videoId, content } = call.request;
+      const { videoId, content, segmentsJson } = call.request;
 
       const transcript = await prisma.videoTranscript.create({
-        data: { videoId, content },
+        data: { videoId, content, segmentsJson },
       });
 
       callback(null, { transcriptId: transcript.id });
@@ -223,6 +223,7 @@ export const vidMetadataHandlers: VidMetadataServer = {
           id: transcript.id,
           videoId: transcript.videoId,
           content: transcript.content,
+          segmentsJson: transcript.segmentsJson,
           createdAt: transcript.createdAt,
         },
       });
