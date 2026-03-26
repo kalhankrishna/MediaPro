@@ -1,5 +1,5 @@
 # MediaPro — Architecture & Context Document
-> Last updated: 2026-03-23
+> Last updated: 2026-03-26
 > Keep this file in the repo root. Commit after every significant decision.
 
 ---
@@ -518,10 +518,11 @@ DELETE /api-keys/:id  → revoke (ownership-checked via userId)
 `try/catch` is scoped to `JSON.parse` only — `redirect()` throws `NEXT_REDIRECT` internally and must not be called inside a catch block or the throw is swallowed. Validation guard (`!decoded.userId || !decoded.email`) runs outside the try block. No JWT verification — gateway validates on every call.
 
 **Completed pages:**
-- `/` — Landing page. Server Component. Redirects to `/dashboard` if `access_token` cookie present.
+- `/` — Landing page. Server Component. Redirects to `/dashboard` if `access_token` cookie present. Content centered on large screens; pipeline string scales to `text-xs` on mobile to prevent overflow.
 - `/login` — Server Component. Reads `?error` search param, maps to user-facing message. CTA: `<a href="/api/auth/github">` → kicks off OAuth.
 - `/dashboard` — Server Component shell + `<VideoList>` Client Component. Fetches initial videos server-side; passes to `VideoList` as `initialVideos`. 401 from gateway → redirect to `/login?error=session_expired`.
 - `/upload` — Server Component shell + `<UploadForm>` Client Component. Full upload state machine: `idle → selected → uploading → confirming → done → error`. Drag-and-drop + click-to-browse. Extracts video metadata (resolution, duration) from HTML5 `<video>` element client-side before upload. Uses `XMLHttpRequest` for direct S3 PUT (supports progress events + `.abort()`). Auto-redirects to `/dashboard` 1.8s after success.
+- `/videos/[id]` — Server Component shell + `<VideoDetail>` Client Component. Status polling (tick-bump pattern, stops at terminal). Native `<video controls>` player loads presigned GET URL client-side. Transcript fetched server-side as initial prop; client re-fetches when pipeline reaches COMPLETED. WebVTT captions generated from Groq segment timestamps (per-line sync); falls back to single-cue if segments unavailable.
 
 **Dashboard polling pattern:**
 - `VideoList.tsx` (`'use client'`) polls `/api/videos?userId=X` every 3 seconds.
@@ -536,10 +537,29 @@ DELETE /api-keys/:id  → revoke (ownership-checked via userId)
 4. `POST /api/upload/confirm` (Route Handler) → `gateway.confirmUpload` → triggers pipeline
 5. Orphaned record cleanup: if S3 upload is cancelled or `getUploadUrl` fails, `POST /api/upload/cancel` calls `gateway.deleteVideo` (best-effort — silently ignored if gateway doesn't support DELETE yet). `videoIdRef` tracks the record until `confirmUpload` succeeds or cleanup fires.
 
+**Video detail flow:**
+1. Server Component fetches `getVideo` + `getTranscript` in parallel (transcript 404 → null, not an error)
+2. `VideoDetail` Client Component polls `/api/videos/[id]` every 3s while status is non-terminal
+3. On COMPLETED, `VideoPlayer` fetches presigned stream URL via `/api/videos/[id]/stream-url?key=<s3key>`
+4. VTT caption blob built client-side from `segmentsJson` (Groq segment timestamps); revoked on cleanup
+
+**Synchronized captions (full stack):**
+- Worker requests `verbose_json` from Groq Whisper; stores `segments` array as `segmentsJson` JSON string alongside `content`
+- `segmentsJson` flows: worker → gRPC `CreateTranscript` → Prisma `VideoTranscript.segments_json` → `GetTranscript` → gateway REST → frontend
+- Frontend `buildVttUrl()` generates multi-cue VTT from segments when available, falls back to single-cue
+- `bigint` JSON replacer on Express app (`fileSize` int64 serializes as string); `VideoFile.fileSize` typed as `string` in frontend
+
+**Shared modules:**
+- `lib/videoStatus.tsx` — `STATUS` config, `TERMINAL` set, `COMPLETED`/`FAILED` constants, `StatusBadge` component. Shared by dashboard and detail page.
+- `app/components/MetaRow.tsx` — shared label/value row. Used by upload form and video detail.
+
 **API routes (Next.js Route Handlers):**
 - `GET /api/auth/github` → 307 redirect to `GATEWAY_URL/auth/github`. Keeps `GATEWAY_URL` server-side.
 - `POST /api/auth/logout` → best-effort POST to gateway (invalidates refresh token), clears `access_token` cookie, redirects to `/login`.
 - `GET /api/videos?userId=X` → proxies to `GATEWAY_URL/videos?userId=X` with cookie forwarding. Used for client-side polling (keeps `GATEWAY_URL` out of browser bundle). Returns 503 on gateway unreachable.
+- `GET /api/videos/[id]` → proxies single video fetch. Used for detail page polling.
+- `GET /api/videos/[id]/stream-url?key=` → proxies presigned GET URL. Key validated server-side against `raw/{id}/`, `processed/{id}/`, `assets/{id}/` prefixes.
+- `GET /api/videos/[id]/transcript` → proxies transcript fetch; 404 from gateway returns `{ content: null }` (not an error — transcript not yet generated).
 - `POST /api/upload` → `createVideo` + `getUploadUrl`; split into separate try blocks so a `getUploadUrl` failure triggers `deleteVideo` cleanup before returning error. Validates `contentType` against server-side allowlist before calling gateway.
 - `POST /api/upload/confirm` → `confirmUpload`. Triggers BullMQ pipeline.
 - `POST /api/upload/cancel` → `deleteVideo` (best-effort, errors swallowed). Called on user cancel and on client-side upload errors.
@@ -687,7 +707,7 @@ P2002 (unique constraint) caught and handled — returns existing fileId. Handle
 
 | Item | Status |
 |---|---|
-| Phase 6 Next.js frontend | 🚧 In progress — `/`, `/login`, `/dashboard`, `/upload` complete; `/videos/[id]`, `/search`, `/api-keys` queued |
+| Phase 6 Next.js frontend | 🚧 In progress — `/`, `/login`, `/dashboard`, `/upload`, `/videos/[id]` complete; `/search`, `/api-keys` queued |
 | Phase 8a Security hardening + logging/monitoring | ⬜ Queued |
 | Phase 8b Hetzner deployment (Caddy, PM2, GitHub Actions) | ⬜ Queued |
 | Phase 8c AWS Lambda thumbnail generator | ⬜ Queued (after 8b — Lambda needs public Gateway URL) |
