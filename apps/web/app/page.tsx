@@ -13,29 +13,29 @@ export default async function Home() {
   if (cookieStore.get('access_token')) redirect('/dashboard');
 
   return (
-    <div className="min-h-screen flex flex-col bg-[#09090b] text-white">
+    <div className="min-h-screen flex flex-col bg-background text-white">
 
       {/* Main content — vertically centred */}
-      <main className="flex-1 flex flex-col justify-center px-8 sm:px-16 lg:px-24">
-        <div className="max-w-xl">
+      <main className="flex-1 flex flex-col justify-center items-center px-8 sm:px-16 lg:px-24 py-12 sm:py-0">
+        <div className="w-full max-w-xl text-center sm:text-left">
 
-          {/* Category label */}
-          <p className="font-mono text-[11px] tracking-[0.18em] uppercase text-zinc-600 mb-10">
+          {/* Category label — sets context before the wordmark */}
+          <p className="font-mono text-[11px] tracking-[0.18em] uppercase text-zinc-500 mb-8 sm:mb-12">
             Distributed Video Infrastructure
           </p>
 
           {/* Wordmark */}
-          <h1 className="text-6xl sm:text-7xl font-semibold tracking-tight leading-none text-white mb-5">
+          <h1 className="text-6xl sm:text-7xl font-semibold tracking-tight leading-none text-white mb-3 sm:mb-4">
             MediaPro
           </h1>
 
-          {/* Pipeline — the real hero */}
-          <p className="font-mono text-sm text-zinc-500 mb-7 tracking-wide">
+          {/* Pipeline — tagline for the wordmark; tight to h1, generous below */}
+          <p className="font-mono text-xs sm:text-sm text-zinc-500 mb-10 sm:mb-12 tracking-wide leading-relaxed">
             RAW → 480p · 720p · 1080p → transcript → embeddings → /search
           </p>
 
           {/* Description */}
-          <p className="text-zinc-400 text-[15px] leading-7 mb-10 max-w-sm">
+          <p className="text-zinc-400 text-[15px] leading-7 mb-8 max-w-sm">
             Video processing pipeline with gRPC microservices,
             BullMQ workers, semantic search, and an MCP server
             for agentic access.
@@ -44,19 +44,19 @@ export default async function Home() {
           {/* CTA */}
           <Link
             href="/login"
-            className="inline-flex items-center gap-2.5 px-5 py-2.5 bg-white text-zinc-950 text-sm font-medium rounded hover:bg-zinc-100 transition-colors duration-150"
+            className="inline-flex items-center gap-2.5 px-5 py-3 bg-white text-zinc-950 text-sm font-medium rounded hover:bg-zinc-100 transition-colors duration-150"
           >
             Sign in with GitHub
-            <span className="text-zinc-400">→</span>
+            <span className="text-zinc-600">→</span>
           </Link>
         </div>
       </main>
 
       {/* Stack strip — pinned to bottom */}
-      <footer className="px-8 sm:px-16 lg:px-24 py-7 border-t border-zinc-900">
-        <div className="flex flex-wrap gap-x-6 gap-y-2">
+      <footer className="px-8 sm:px-16 lg:px-24 py-5 sm:py-7 border-t border-zinc-900">
+        <div className="flex flex-wrap justify-center gap-x-4 sm:gap-x-6 gap-y-2">
           {STACK.map((tech) => (
-            <span key={tech} className="font-mono text-[11px] text-zinc-600">
+            <span key={tech} className="font-mono text-[11px] text-zinc-500">
               {tech}
             </span>
           ))}
