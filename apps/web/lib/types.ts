@@ -1,7 +1,7 @@
 export interface VideoFile {
   id: string;
   s3Key: string;
-  fileSize: number;
+  fileSize: string;
   format: number;
   createdAt: string;
 }

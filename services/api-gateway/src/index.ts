@@ -13,6 +13,10 @@ if (!process.env.COOKIE_SECRET) throw new Error('COOKIE_SECRET is not defined');
 const app = express();
 const PORT = parseInt(process.env.PORT ?? '3000', 10);
 
+app.set('json replacer', (_key: string, value: unknown) =>
+  typeof value === 'bigint' ? value.toString() : value
+);
+
 app.use(express.json());
 app.use(cookieParser(process.env.COOKIE_SECRET));
 

@@ -7,6 +7,8 @@ import type {
   GetVideoResponse,
   ListUserVideosRequest,
   ListUserVideosResponse,
+  GetTranscriptRequest,
+  GetTranscriptResponse,
 } from '@mediapro/proto';
 
 export const createVideo = promisify(
@@ -20,3 +22,7 @@ export const getVideo = promisify(
 export const listUserVideos = promisify(
   grpcClient.listUserVideos.bind(grpcClient)
 ) as (req: ListUserVideosRequest) => Promise<ListUserVideosResponse>;
+
+export const getTranscript = promisify(
+  grpcClient.getTranscript.bind(grpcClient)
+) as (req: GetTranscriptRequest) => Promise<GetTranscriptResponse>;

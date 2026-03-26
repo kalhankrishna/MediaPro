@@ -1,4 +1,5 @@
 import { cookies } from 'next/headers';
+import type { Video } from '@/lib/types';
 
 const GATEWAY_URL = process.env.GATEWAY_URL ?? 'http://localhost:3000';
 
@@ -44,7 +45,7 @@ export const gateway = {
     gatewayFetch<{ videos: any[] }>(`/videos?userId=${userId}`),
 
   getVideo: (videoId: string) =>
-    gatewayFetch<{ id: string; title: string; status: string; files: any[] }>(`/videos/${videoId}`),
+    gatewayFetch<Video>(`/videos/${videoId}`),
 
   createVideo: (payload: { userId: string; title: string; originalResolution: string; duration: number }) =>
     gatewayFetch<{ videoId: string }>('/videos', {
@@ -62,6 +63,9 @@ export const gateway = {
     gatewayFetch<{ message: string }>(`/videos/${videoId}/confirm`, {
       method: 'POST',
     }),
+
+  getTranscript: (videoId: string) =>
+    gatewayFetch<{ content: string; createdAt: string }>(`/videos/${videoId}/transcript`),
 
   deleteVideo: (videoId: string) =>
     gatewayFetch<{ message: string }>(`/videos/${videoId}`, {
