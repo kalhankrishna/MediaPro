@@ -1,5 +1,5 @@
 # MediaPro — Architecture & Context Document
-> Last updated: 2026-03-27
+> Last updated: 2026-03-28
 > Keep this file in the repo root. Commit after every significant decision.
 
 ---
@@ -27,7 +27,7 @@
 | Phase 5 | MCP Server | ✅ Complete |
 | Phase 7a | Human auth (GitHub OAuth + PKCE + JWT cookies) | ✅ Complete |
 | Phase 7b | Agent auth (API keys) | ✅ Complete |
-| Phase 6 | Next.js frontend | 🚧 In progress |
+| Phase 6 | Next.js frontend | ✅ Complete |
 | Phase 8a | Security hardening + logging/monitoring | ⬜ Queued |
 | Phase 8b | Hetzner deployment (Caddy, PM2, GitHub Actions) | ⬜ Queued |
 | Phase 8c | Lambda thumbnail generation | ⬜ Queued |
@@ -525,6 +525,10 @@ DELETE /api-keys/:id  → revoke (ownership-checked via userId)
 - `/upload` — Server Component shell + `<UploadForm>` Client Component. Full upload state machine: `idle → selected → uploading → confirming → done → error`. Drag-and-drop + click-to-browse. Extracts video metadata (resolution, duration) from HTML5 `<video>` element client-side before upload. Uses `XMLHttpRequest` for direct S3 PUT (supports progress events + `.abort()`). Auto-redirects to `/dashboard` 1.8s after success.
 - `/videos/[id]` — Server Component shell + `<VideoDetail>` Client Component. Status polling (tick-bump pattern, stops at terminal). Native `<video controls>` player loads presigned GET URL client-side. Transcript fetched server-side as initial prop; client re-fetches when pipeline reaches COMPLETED. WebVTT captions generated from Groq segment timestamps (per-line sync); falls back to single-cue if segments unavailable.
 - `/search` — Server Component shell + `<SearchForm>` Client Component. Submits query to `POST /api/search` → gateway → Voyage AI embed → pgvector cosine similarity → Groq llama answer generation. Displays AI-generated answer block above ranked source excerpts. Each source links to `/videos/[id]`. Relevance badges use a 4-level enum (exact ≥0.85 emerald, strong ≥0.70 sky, partial ≥0.55 zinc, weak <0.55 red) mapping to `.impeccable.md` color conventions. Entry point: "search" button in dashboard `VideoList` header.
+- `/api-keys` — Server Component shell + `<ApiKeyManager>` Client Component. Lists existing keys (name, created, last used). Create flow: name input → POST → raw key shown in emerald banner with copy button until explicit "I've copied this key" dismiss (key shown once, never retrievable again). Revoke flow: two-step — first click enters confirm state per-row, second click calls DELETE. Entry point: "api keys" nav link in shared Header.
+
+**Shared Header component:**
+- `app/components/Header.tsx` — `'use client'` component, `usePathname()` for active nav state. Three nav links: dashboard · search · api keys. Nav hidden on mobile (`hidden sm:flex`). Active link = `text-white`, inactive = `text-zinc-500 hover:text-zinc-300`. `aria-current="page"` on active link. Focus rings on all nav links. All 5 authenticated pages use this component — eliminates the previous duplicated header pattern.
 
 **Dashboard polling pattern:**
 - `VideoList.tsx` (`'use client'`) polls `/api/videos?userId=X` every 3 seconds.
@@ -554,6 +558,7 @@ DELETE /api-keys/:id  → revoke (ownership-checked via userId)
 **Shared modules:**
 - `lib/videoStatus.tsx` — `STATUS` config, `TERMINAL` set, `COMPLETED`/`FAILED` constants, `StatusBadge` component. Shared by dashboard and detail page.
 - `app/components/MetaRow.tsx` — shared label/value row. Used by upload form and video detail.
+- `app/components/Header.tsx` — shared authenticated header with nav. Used by all 5 authenticated pages.
 
 **API routes (Next.js Route Handlers):**
 - `GET /api/auth/github` → 307 redirect to `GATEWAY_URL/auth/github`. Keeps `GATEWAY_URL` server-side.
@@ -566,6 +571,9 @@ DELETE /api-keys/:id  → revoke (ownership-checked via userId)
 - `POST /api/upload/confirm` → `confirmUpload`. Triggers BullMQ pipeline.
 - `POST /api/upload/cancel` → `deleteVideo` (best-effort, errors swallowed). Called on user cancel and on client-side upload errors.
 - `POST /api/search` → proxies to `GATEWAY_URL/search` with cookie forwarding. Validates query is non-empty before forwarding.
+- `GET /api/api-keys` → lists keys (metadata only — name, createdAt, lastUsedAt; never raw key).
+- `POST /api/api-keys` → creates key; validates name non-empty server-side; returns `{ keyId, key, name }` (raw key shown once).
+- `DELETE /api/api-keys/[id]` → revokes key by ID.
 
 **Shared types:** `lib/types.ts` exports `Video` and `VideoFile` interfaces matching the proto-decoded REST shape. Status is numeric (proto enum: 1=UPLOADED, 2=PROCESSING, 3=COMPLETED, 4=FAILED, 5=TRANSCRIBING, 6=EMBEDDING). Terminal = 3 or 4.
 
@@ -704,13 +712,19 @@ P2002 (unique constraint) caught and handled — returns existing fileId. Handle
 - **Stateless** (MediaPro's approach) = MCP server is a translator/proxy. New instance per request. No SSE. `sessionIdGenerator: undefined`.
 - **Stateful** = MCP server is a participant with persistent session. Needs Redis pub/sub for horizontal scaling. Supports SSE (GET /mcp).
 
+### MCP Server — Known Design Issue
+`list_videos` and `upload_video` tools require `userId` as an explicit input parameter. This is redundant — the API key Bearer token already authenticates the user and `req.user.userId` is available server-side. An agent can also pass an arbitrary userId that doesn't match the authenticated user (no server-side cross-check). Correct fix: derive `userId` from `req.user.userId` in the tool handler and remove it from the input schema. Deferred to Phase 8a (security hardening).
+
+### MCP Client Integration
+The MCP server can be connected directly to Claude Code via `~/.claude/mcp.json` using Streamable HTTP transport with the API key as a Bearer token. This enables Claude Code to call `list_videos`, `get_video`, `search_videos`, `upload_video`, and `confirm_upload` natively as tools. Tested: full agentic upload flow (file → presigned URL → S3 PUT → confirm) executed via Claude Code + MCP without browser involvement.
+
 ---
 
 ## Open / Unresolved
 
 | Item | Status |
 |---|---|
-| Phase 6 Next.js frontend | 🚧 In progress — `/`, `/login`, `/dashboard`, `/upload`, `/videos/[id]`, `/search` complete; `/api-keys` queued |
+| Phase 6 Next.js frontend | ✅ Complete — `/`, `/login`, `/dashboard`, `/upload`, `/videos/[id]`, `/search`, `/api-keys` all done |
 | Phase 8a Security hardening + logging/monitoring | ⬜ Queued |
 | Phase 8b Hetzner deployment (Caddy, PM2, GitHub Actions) | ⬜ Queued |
 | Phase 8c AWS Lambda thumbnail generator | ⬜ Queued (after 8b — Lambda needs public Gateway URL) |

@@ -1,23 +1,26 @@
 import type { Metadata } from 'next';
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
-import Header from '@/app/components/Header';
 import { gateway, GatewayError } from '@/lib/gateway';
-import type { Video } from '@/lib/types';
-import VideoList from './VideoList';
+import Header from '@/app/components/Header';
+import ApiKeyManager from './ApiKeyManager';
 
 export const metadata: Metadata = {
-  title: 'Dashboard — MediaPro',
+  title: 'API Keys — MediaPro',
 };
 
-export default async function DashboardPage() {
+interface ApiKey {
+  id: string;
+  name: string;
+  createdAt: string;
+  lastUsedAt: string | null;
+}
+
+export default async function ApiKeysPage() {
   const cookieStore = await cookies();
   const token = cookieStore.get('access_token')?.value;
   if (!token) redirect('/login');
 
-  // Decode JWT payload — no verification needed, gateway validates on every request.
-  // try/catch is scoped to JSON.parse only; redirect() throws NEXT_REDIRECT internally
-  // and must not be called inside a catch block or it will be swallowed and re-thrown.
   let decoded: { userId?: unknown; email?: unknown };
   try {
     const [, p] = token.split('.');
@@ -26,25 +29,24 @@ export default async function DashboardPage() {
     redirect('/login');
   }
   if (!decoded!.userId || !decoded!.email) redirect('/login');
-  const userId = decoded!.userId as string;
   const email = decoded!.email as string;
 
-  let initialVideos: Video[] = [];
+  let initialKeys: ApiKey[] = [];
   try {
-    const { videos } = await gateway.listVideos(userId!);
-    initialVideos = videos;
+    const { keys } = await gateway.listApiKeys();
+    initialKeys = keys;
   } catch (err) {
     if (err instanceof GatewayError && err.status === 401) {
       redirect('/login?error=session_expired');
     }
-    // Other errors: render with empty list, client will retry via polling
+    // Other errors: render with empty list
   }
 
   return (
     <div className="min-h-screen bg-background text-white flex flex-col">
-      <Header email={email!} />
+      <Header email={email} />
       <main className="flex-1 px-4 sm:px-6 pt-8 pb-6 max-w-5xl w-full mx-auto">
-        <VideoList initialVideos={initialVideos} userId={userId!} />
+        <ApiKeyManager initialKeys={initialKeys} />
       </main>
     </div>
   );
