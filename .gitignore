@@ -50,6 +50,6 @@ coverage/
 scripts/
 
 # Claude
-*.claude
-*CLAUDE.md
-*MEDIAPRO_CONTEXT.md
+.claude
+CLAUDE.md
+MEDIAPRO_CONTEXT.md
