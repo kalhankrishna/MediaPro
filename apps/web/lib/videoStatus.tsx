@@ -20,7 +20,7 @@ export function StatusBadge({ status }: { status: number }) {
     <span className={`inline-flex items-center gap-1.5 font-mono text-[11px] ${cfg.text}`}>
       <span
         aria-hidden="true"
-        className={`w-1.5 h-1.5 rounded-full shrink-0 ${cfg.dot} ${cfg.pulse ? 'animate-pulse' : ''}`}
+        className={`w-1.5 h-1.5 rounded-full shrink-0 ${cfg.dot} ${cfg.pulse ? 'motion-safe:animate-pulse' : ''}`}
       />
       {cfg.label}
     </span>

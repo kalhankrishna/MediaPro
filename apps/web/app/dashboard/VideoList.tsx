@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import type { Video } from '@/lib/types';
-import { STATUS, TERMINAL, StatusBadge } from '@/lib/videoStatus';
+import { TERMINAL, StatusBadge } from '@/lib/videoStatus';
 
 const POLL_MS = 3000;
 
@@ -106,7 +106,7 @@ export default function VideoList({
             {isPolling && (
               <span
                 aria-hidden="true"
-                className="w-1.5 h-1.5 rounded-full bg-sky-500 animate-pulse"
+                className="w-1.5 h-1.5 rounded-full bg-sky-500 motion-safe:animate-pulse"
               />
             )}
           </span>

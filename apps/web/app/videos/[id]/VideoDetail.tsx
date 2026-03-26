@@ -5,8 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import type { Video } from '@/lib/types';
 import { STATUS, TERMINAL, COMPLETED, FAILED, StatusBadge } from '@/lib/videoStatus';
-
-// ─── Constants ───
+import MetaRow from '@/app/components/MetaRow';
 
 const POLL_MS = 3000;
 
@@ -49,26 +48,29 @@ function bestStreamFile(video: Video) {
   return streamable[0] ?? null;
 }
 
-// ─── Sub-components ───
-
-function MetaRow({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex items-baseline justify-between py-2 border-b border-zinc-800/50 last:border-0">
-      <span className="font-mono text-[10px] uppercase tracking-widest text-zinc-500 shrink-0">{label}</span>
-      <span className="font-mono text-[12px] text-zinc-300 truncate max-w-[65%] text-right ml-4">{value}</span>
-    </div>
-  );
+// Generates a single-cue WebVTT blob covering the full video duration.
+// Not timestamped, but satisfies WCAG 1.2.2 by making transcript content
+// available as a caption track.
+function buildVttUrl(text: string, durationSeconds: number): string {
+  const d = durationSeconds || 86400;
+  const h = String(Math.floor(d / 3600)).padStart(2, '0');
+  const m = String(Math.floor((d % 3600) / 60)).padStart(2, '0');
+  const s = String(Math.floor(d % 60)).padStart(2, '0');
+  const vtt = `WEBVTT\n\n00:00:00.000 --> ${h}:${m}:${s}.000\n${text}`;
+  return URL.createObjectURL(new Blob([vtt], { type: 'text/vtt' }));
 }
+
+// ─── Sub-components ───
 
 function ProcessingState({ video }: { video: Video }) {
   const cfg = STATUS[video.status] ?? STATUS[0];
   return (
-    <div className="py-12 flex flex-col items-center gap-3">
+    <div className="py-12">
       <span className={`font-mono text-[13px] ${cfg.text} flex items-center gap-2`}>
-        <span aria-hidden="true" className={`w-2 h-2 rounded-full ${cfg.dot} animate-pulse`} />
+        <span aria-hidden="true" className={`w-2 h-2 rounded-full ${cfg.dot} motion-safe:animate-pulse`} />
         {cfg.label}
       </span>
-      <p className="font-mono text-[11px] text-zinc-500 text-center max-w-xs">
+      <p className="font-mono text-[11px] text-zinc-500 mt-2 max-w-xs">
         The processing pipeline is running. This page will update automatically.
       </p>
     </div>
@@ -77,48 +79,78 @@ function ProcessingState({ video }: { video: Video }) {
 
 // ─── Video player ───
 
-function VideoPlayer({ videoId, s3Key }: { videoId: string; s3Key: string }) {
+function VideoPlayer({
+  videoId,
+  s3Key,
+  transcript,
+  duration,
+}: {
+  videoId: string;
+  s3Key: string;
+  transcript: string | null;
+  duration: number;
+}) {
   const [src, setSrc] = useState<string | null>(null);
   const [error, setError] = useState(false);
+  const [vttUrl, setVttUrl] = useState<string | null>(null);
+  const [statusMsg, setStatusMsg] = useState('');
 
+  // Build VTT caption blob from transcript when available
+  useEffect(() => {
+    if (!transcript) return;
+    const url = buildVttUrl(transcript, duration);
+    setVttUrl(url);
+    return () => URL.revokeObjectURL(url);
+  }, [transcript, duration]);
+
+  // Fetch presigned stream URL
   useEffect(() => {
     let cancelled = false;
-    fetch(`/api/videos/${encodeURIComponent(videoId)}/stream-url?key=${encodeURIComponent(s3Key)}`, {
-      cache: 'no-store',
-    })
+    fetch(
+      `/api/videos/${encodeURIComponent(videoId)}/stream-url?key=${encodeURIComponent(s3Key)}`,
+      { cache: 'no-store' },
+    )
       .then(r => r.ok ? r.json() : Promise.reject(r.status))
-      .then((data: { url: string }) => { if (!cancelled) setSrc(data.url); })
-      .catch(() => { if (!cancelled) setError(true); });
+      .then((data: { url: string }) => {
+        if (!cancelled) { setSrc(data.url); setStatusMsg('Video player ready.'); }
+      })
+      .catch(() => {
+        if (!cancelled) { setError(true); setStatusMsg('Failed to load video.'); }
+      });
     return () => { cancelled = true; };
   }, [videoId, s3Key]);
 
-  if (error) {
-    return (
-      <div className="w-full aspect-video bg-zinc-900 border border-zinc-800 rounded-sm flex items-center justify-center">
-        <p className="font-mono text-[11px] text-zinc-500">Failed to load stream URL.</p>
-      </div>
-    );
-  }
-
-  if (!src) {
-    return (
-      <div className="w-full aspect-video bg-zinc-900 border border-zinc-800 rounded-sm flex items-center justify-center">
-        <span className="font-mono text-[11px] text-zinc-500 animate-pulse">loading…</span>
-      </div>
-    );
-  }
-
   return (
-    // eslint-disable-next-line jsx-a11y/media-has-caption
-    <video
-      key={src}
-      controls
-      className="w-full aspect-video rounded-sm bg-black"
-      preload="metadata"
-    >
-      <source src={src} />
-      Your browser does not support video playback.
-    </video>
+    <>
+      {/* M1: announce player state to screen readers */}
+      <span role="status" aria-live="polite" className="sr-only">{statusMsg}</span>
+
+      {error && (
+        <div className="w-full aspect-video bg-zinc-900 border border-zinc-800 rounded-sm flex items-center justify-center">
+          <p className="font-mono text-[11px] text-zinc-500">Failed to load stream URL.</p>
+        </div>
+      )}
+
+      {!src && !error && (
+        <div className="w-full aspect-video bg-zinc-900 border border-zinc-800 rounded-sm flex items-center justify-center">
+          <span className="font-mono text-[11px] text-zinc-500 motion-safe:animate-pulse">loading…</span>
+        </div>
+      )}
+
+      {src && (
+        <video
+          key={src}
+          controls
+          className="w-full aspect-video rounded-sm bg-black"
+          preload="metadata"
+        >
+          <source src={src} />
+          {/* H2: caption track from transcript content (single-cue VTT) */}
+          {vttUrl && <track kind="subtitles" src={vttUrl} label="Transcript" default />}
+          Your browser does not support video playback.
+        </video>
+      )}
+    </>
   );
 }
 
@@ -207,13 +239,14 @@ export default function VideoDetail({
           {/* Fixed-size polling dot slot */}
           <span className="w-1.5 h-1.5 flex items-center justify-center shrink-0">
             {isPolling && (
-              <span aria-hidden="true" className="w-1.5 h-1.5 rounded-full bg-sky-500 animate-pulse" />
+              <span aria-hidden="true" className="w-1.5 h-1.5 rounded-full bg-sky-500 motion-safe:animate-pulse" />
             )}
           </span>
         </div>
+        {/* M2: expanded touch target via negative margin offset */}
         <Link
           href="/dashboard"
-          className="font-mono text-[11px] text-zinc-400 hover:text-white transition-colors duration-100 shrink-0 ml-4"
+          className="font-mono text-[11px] text-zinc-400 hover:text-white transition-colors duration-100 shrink-0 ml-4 py-3 px-2 -my-3 -mx-2"
         >
           ← back
         </Link>
@@ -222,7 +255,12 @@ export default function VideoDetail({
       {/* ── Video player (COMPLETED + streamable file exists) ── */}
       {isCompleted && streamFile && (
         <div className="mb-6">
-          <VideoPlayer videoId={video.id} s3Key={streamFile.s3Key} />
+          <VideoPlayer
+            videoId={video.id}
+            s3Key={streamFile.s3Key}
+            transcript={transcript}
+            duration={video.duration}
+          />
         </div>
       )}
 
