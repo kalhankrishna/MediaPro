@@ -48,3 +48,6 @@ coverage/
 
 # Scripts
 scripts/
+
+# Claude
+.claude
