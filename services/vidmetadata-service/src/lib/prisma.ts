@@ -1,6 +1,7 @@
 import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "../generated/prisma/client.js";
 import type * as grpc from '@grpc/grpc-js';
+import { logger } from './logger.js';
 
 const adapter = new PrismaPg({
   connectionString: process.env.DATABASE_URL,
@@ -24,14 +25,14 @@ export function registerGrpcServer(server: grpc.Server) {
 
 // Graceful shutdown handler
 async function gracefulShutdown(signal: string) {
-  console.log(`\n${signal} received, starting graceful shutdown...`);
-  
+  logger.info({ signal }, 'starting graceful shutdown');
+
   let shutdownComplete = false;
 
   // Force shutdown after 10 seconds
   const forceShutdownTimer = setTimeout(() => {
     if (!shutdownComplete) {
-      console.error('Graceful shutdown timeout, forcing shutdown');
+      logger.error('graceful shutdown timeout, forcing shutdown');
       if (grpcServer) grpcServer.forceShutdown();
       process.exit(1);
     }
@@ -43,28 +44,28 @@ async function gracefulShutdown(signal: string) {
         if(grpcServer){
             grpcServer.tryShutdown((err) => {
                 if (err) {
-                    console.error('gRPC server shutdown error:', err);
+                    logger.error({ err }, 'gRPC server shutdown error');
                     if(grpcServer) grpcServer.forceShutdown();
                     reject(err);
                 } else {
-                    console.log('gRPC server shut down successfully');
+                    logger.info('gRPC server shut down successfully');
                     resolve();
                 }
             });
         }
         else{
-            console.warn('No gRPC server instance found to shut down');
+            logger.warn('no gRPC server instance found to shut down');
             resolve();
         }
     });
 
     shutdownComplete = true;
     clearTimeout(forceShutdownTimer);
-    console.log('Graceful shutdown complete');
+    logger.info('graceful shutdown complete');
     process.exit(0);
   }
   catch (error) {
-    console.error('Error during shutdown:', error);
+    logger.error({ err: error }, 'error during shutdown');
     clearTimeout(forceShutdownTimer);
     process.exit(1);
   }

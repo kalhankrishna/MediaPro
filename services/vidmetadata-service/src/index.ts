@@ -2,6 +2,7 @@ import 'dotenv/config';
 import * as grpc from '@grpc/grpc-js';
 import { createServer } from './server.js';
 import { registerGrpcServer } from './lib/prisma.js';
+import { logger } from './lib/logger.js';
 
 const PORT = process.env.GRPC_PORT ?? '50051';
 
@@ -13,9 +14,9 @@ server.bindAsync(
   grpc.ServerCredentials.createInsecure(),
   (err, port) => {
     if (err) {
-      console.error('Failed to bind server:', err);
+      logger.error({ err }, 'failed to bind gRPC server');
       process.exit(1);
     }
-    console.log(`vidmetadata-service gRPC server listening on port ${port}`);
+    logger.info({ port }, 'vidmetadata-service gRPC server listening');
   }
 );

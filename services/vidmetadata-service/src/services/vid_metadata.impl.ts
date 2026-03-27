@@ -4,8 +4,30 @@ import { VideoStatus as ProtoVideoStatus } from '@mediapro/proto';
 import { prisma } from "../lib/prisma.js";
 import { Prisma } from "../generated/prisma/client.js";
 import { mapVideoStatusToPrisma, mapFileFormatToPrisma, mapVideoStatusToProto, mapFileFormatToProto } from '../lib/enumMappers.js';
+import { logger } from '../lib/logger.js';
 
-export const vidMetadataHandlers: VidMetadataServer = {
+function wrapWithLogging(handlers: VidMetadataServer): VidMetadataServer {
+  return Object.fromEntries(
+    Object.entries(handlers).map(([method, handler]) => [
+      method,
+      (call: unknown, callback: (err: { code?: unknown; message?: unknown } | null, res?: unknown) => void) => {
+        const start = Date.now();
+        const logged = (err: { code?: unknown; message?: unknown } | null, res?: unknown) => {
+          const ms = Date.now() - start;
+          if (err) {
+            logger.error({ method, ms, grpcCode: err.code }, err.message ? String(err.message) : 'rpc error');
+          } else {
+            logger.info({ method, ms }, 'rpc completed');
+          }
+          callback(err, res);
+        };
+        (handler as (c: unknown, cb: typeof logged) => void)(call, logged);
+      },
+    ])
+  ) as unknown as VidMetadataServer;
+}
+
+const handlers: VidMetadataServer = {
   createVideo: async (call, callback) => {
     try{
       const { userId, title, originalResolution, duration } = call.request;
@@ -480,3 +502,5 @@ export const vidMetadataHandlers: VidMetadataServer = {
     }
   },
 };
+
+export const vidMetadataHandlers = wrapWithLogging(handlers);
