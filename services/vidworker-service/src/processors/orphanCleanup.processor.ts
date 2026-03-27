@@ -4,6 +4,7 @@ import { s3, S3_BUCKET } from '../lib/s3Client.js';
 import { listVideosByStatus, updateVideoStatus } from '../lib/vidMetadataService.js';
 import { VideoStatus } from '@mediapro/proto';
 import { type VideoProcessingJob } from '@mediapro/queue';
+import { logger } from '../lib/logger.js';
 
 const ORPHAN_THRESHOLD_MS = 45 * 60 * 1000;
 
@@ -17,11 +18,11 @@ export function createOrphanCleanupProcessor(videoQueue: Queue<VideoProcessingJo
     });
 
     if (videos.length === 0) {
-      console.log('[orphan-cleanup] No orphaned videos found.');
+      logger.info('no orphaned videos found');
       return;
     }
 
-    console.log(`[orphan-cleanup] Found ${videos.length} candidate(s).`);
+    logger.info({ count: videos.length }, 'orphan candidates found');
 
     for (const video of videos) {
       const rawKey = `raw/${video.id}/raw.mp4`;
@@ -40,7 +41,7 @@ export function createOrphanCleanupProcessor(videoQueue: Queue<VideoProcessingJo
       }
 
       if (fileExists) {
-        console.log(`[orphan-cleanup] ${video.id}: file in S3, re-enqueuing.`);
+        logger.info({ videoId: video.id }, 'file in S3, re-enqueuing');
         await videoQueue.add(
           'process',
           { videoId: video.id, rawS3Key: rawKey },
@@ -50,7 +51,7 @@ export function createOrphanCleanupProcessor(videoQueue: Queue<VideoProcessingJo
           },
         );
       } else {
-        console.log(`[orphan-cleanup] ${video.id}: no S3 file, marking FAILED.`);
+        logger.info({ videoId: video.id }, 'no S3 file, marking FAILED');
         await updateVideoStatus({
           videoId: video.id,
           status: VideoStatus.VIDEO_STATUS_FAILED,

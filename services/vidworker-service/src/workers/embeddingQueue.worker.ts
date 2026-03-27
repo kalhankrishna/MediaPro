@@ -2,6 +2,7 @@ import { Worker } from 'bullmq';
 import { redisConnection } from '../config/redis.js';
 import { embeddingQueueProcessor } from '../processors/embeddingQueue.processor.js';
 import { QUEUES } from '@mediapro/queue';
+import { logger } from '../lib/logger.js';
 
 export const embeddingWorker = new Worker(QUEUES.EMBEDDING, embeddingQueueProcessor, {
   connection: redisConnection,
@@ -12,13 +13,13 @@ export const embeddingWorker = new Worker(QUEUES.EMBEDDING, embeddingQueueProces
 });
 
 embeddingWorker.on('completed', (job, returnValue) => {
-  console.log(`[${job.id}] completed`, returnValue);
+  logger.info({ jobId: job.id, returnValue }, 'job completed');
 });
 
 embeddingWorker.on('failed', (job, err) => {
-  console.error(`[${job?.id}] failed: ${err.message}`);
+  logger.error({ jobId: job?.id, err }, 'job failed');
 });
 
 embeddingWorker.on('error', (err) => {
-  console.error('Worker error:', err);
+  logger.error({ err }, 'worker error');
 });

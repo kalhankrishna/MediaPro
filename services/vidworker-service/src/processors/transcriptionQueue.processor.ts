@@ -13,6 +13,7 @@ import { createTranscript, updateVideoStatus } from "../lib/vidMetadataService.j
 import { type TranscriptionJob, QUEUES, type EmbeddingJob } from "@mediapro/queue";
 import Groq from "groq-sdk";
 import { VideoStatus } from "@mediapro/proto";
+import { logger } from "../lib/logger.js";
 
 const groq = new Groq({
   apiKey: process.env.GROQ_API_KEY,
@@ -75,16 +76,16 @@ export async function transcriptQueueProcessor(job: Job<TranscriptionJob>) {
     try{
         await job.updateProgress(5);
 
-        console.log(`[${job.id}] Downloading ${processedS3Key} from S3...`);
+        logger.info({ jobId: job.id, s3Key: processedS3Key }, 'downloading from S3');
         const s3Object = await s3.send(new GetObjectCommand({ Bucket: S3_BUCKET, Key: processedS3Key }));
         await pipeline(s3Object.Body as Readable, createWriteStream(videoPath));
         await job.updateProgress(20);
 
-        console.log(`[${job.id}] Extracting audio...`);
+        logger.info({ jobId: job.id }, 'extracting audio');
         await extractAudio(videoPath, audioPath);
         await job.updateProgress(40);
 
-        console.log(`[${job.id}] Transcribing via Groq Whisper...`);
+        logger.info({ jobId: job.id }, 'transcribing via Groq Whisper');
         const transcription = await groq.audio.transcriptions.create({
             file: createReadStream(audioPath),
             model: 'whisper-large-v3',
@@ -96,12 +97,12 @@ export async function transcriptQueueProcessor(job: Job<TranscriptionJob>) {
         const content = transcription.text;
         const segmentsJson = JSON.stringify(transcription.segments ?? []);
 
-        console.log(`[${job.id}] Saving transcript...`);
+        logger.info({ jobId: job.id }, 'saving transcript');
         const { transcriptId } = await createTranscript({ videoId, content, segmentsJson });
         await job.updateProgress(85);
 
         await embeddingQueue.add(
-            'embed', 
+            'embed',
             {
                 videoId,
                 transcriptId,
@@ -117,10 +118,10 @@ export async function transcriptQueueProcessor(job: Job<TranscriptionJob>) {
         );
 
         await job.updateProgress(100);
-        console.log(`[${job.id}] Transcription complete.`);
+        logger.info({ jobId: job.id }, 'transcription complete');
     }
     catch(err){
-        console.error(`[${job.id}] Transcription failed:`, err);
+        logger.error({ jobId: job.id, err }, 'transcription failed');
         await updateVideoStatus({ videoId, status: VideoStatus.VIDEO_STATUS_FAILED, errorMessage: err instanceof Error ? err.message : 'Unknown error' });
         throw err;
     }

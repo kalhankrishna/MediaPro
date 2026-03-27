@@ -8,10 +8,12 @@
     "dev:video": "tsx watch --env-file=.env src/entries/video.ts",
     "dev:transcript": "tsx watch --env-file=.env src/entries/transcript.ts",
     "dev:embedding": "tsx watch --env-file=.env src/entries/embedding.ts",
+    "dev:cleanup": "tsx watch --env-file=.env src/entries/cleanup.ts",
     "build": "tsc",
     "start:video": "node dist/entries/video.js",
     "start:transcript": "node dist/entries/transcript.js",
-    "start:embedding": "node dist/entries/embedding.js"
+    "start:embedding": "node dist/entries/embedding.js",
+    "start:cleanup": "node dist/entries/cleanup.js"
   },
   "keywords": [],
   "author": "",
@@ -33,6 +35,7 @@
     "bullmq": "^5.70.1",
     "groq-sdk": "^0.37.0",
     "ioredis": "^5.9.3",
-    "pg": "^8.19.0"
+    "pg": "^8.19.0",
+    "pino": "^10.3.1"
   }
 }

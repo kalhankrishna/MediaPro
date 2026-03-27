@@ -13,6 +13,7 @@ import { s3, S3_BUCKET } from '../lib/s3Client.js';
 import { updateVideoStatus, createVideoFile } from '../lib/vidMetadataService.js';
 import { type VideoProcessingJob, QUEUES } from '@mediapro/queue';
 import { VideoStatus, FileFormat } from '@mediapro/proto';
+import { logger } from '../lib/logger.js';
 
 const transcriptQueue = new Queue(QUEUES.TRANSCRIPTION, {
   connection: redisConnection,
@@ -131,14 +132,14 @@ export async function videoQueueProcessor(job: Job<VideoProcessingJob>): Promise
     );
 
     if (alreadyProcessed.every(Boolean)) {
-      console.log(`[${job.id}] All resolutions already processed, skipping transcode.`);
+      logger.info({ jobId: job.id }, 'all resolutions already processed, skipping transcode');
       const processed720pKey = `processed/${videoId}/720p.mp4`;
       await transcriptQueue.add('transcribe', { videoId, processedS3Key: processed720pKey });
       await job.updateProgress(100);
       return;
     }
 
-    console.log(`[${job.id}] Downloading ${rawS3Key} from S3...`);
+    logger.info({ jobId: job.id, s3Key: rawS3Key }, 'downloading from S3');
     const s3Object = await s3.send(new GetObjectCommand({ Bucket: S3_BUCKET, Key: rawS3Key }));
     await pipeline(s3Object.Body as Readable, createWriteStream(rawFilePath));
 
@@ -150,13 +151,13 @@ export async function videoQueueProcessor(job: Job<VideoProcessingJob>): Promise
       const outputPath = path.join(jobTempDir, `${resolution.name}.mp4`);
       const s3Key = `processed/${videoId}/${resolution.name}.mp4`;
 
-      console.log(`[${job.id}] Transcoding to ${resolution.name}...`);
+      logger.info({ jobId: job.id, resolution: resolution.name }, 'transcoding');
       await transcode(rawFilePath, outputPath, resolution.height);
 
       const { size } = await stat(outputPath);
 
-      console.log(`[${job.id}] Uploading ${resolution.name} to S3...`);
-      
+      logger.info({ jobId: job.id, resolution: resolution.name }, 'uploading to S3');
+
       await new Upload({
         client: s3,
         params: {
@@ -191,11 +192,11 @@ export async function videoQueueProcessor(job: Job<VideoProcessingJob>): Promise
       },
     }).done();
     await job.updateProgress(90);
-    console.log(`[${job.id}] Poster frame uploaded: assets/${videoId}/poster-frame.jpg`);
+    logger.info({ jobId: job.id, s3Key: `assets/${videoId}/poster-frame.jpg` }, 'poster frame uploaded');
 
     if(processed720pKey){
       await transcriptQueue.add(
-        'transcribe', 
+        'transcribe',
         {
           videoId,
           processedS3Key: processed720pKey,
@@ -211,11 +212,11 @@ export async function videoQueueProcessor(job: Job<VideoProcessingJob>): Promise
     }
 
     await job.updateProgress(100);
-    console.log(`[${job.id}] Video processing complete.`);
+    logger.info({ jobId: job.id }, 'video processing complete');
   }
   catch(err){
     await updateVideoStatus({ videoId, status: VideoStatus.VIDEO_STATUS_FAILED, errorMessage: err instanceof Error ? err.message : 'Unknown error' });
-    console.error(`[${job.id}] Error processing video:`, err);
+    logger.error({ jobId: job.id, err }, 'error processing video');
     throw err;
   }
   finally{

@@ -1,12 +1,16 @@
 import { embeddingWorker } from '../workers/embeddingQueue.worker.js';
 import { pool } from '../processors/embeddingQueue.processor.js';
 import { redisConnection } from '../config/redis.js';
+import { logger } from '../lib/logger.js';
+import { startHealthServer } from '../lib/health.js';
 
-console.log('Embedding worker started, waiting for jobs...');
+const healthServer = startHealthServer(redisConnection);
+logger.info('embedding worker started, waiting for jobs');
 
 async function shutdown() {
-  console.log('Shutting down embedding worker...');
+  logger.info('shutting down embedding worker');
   const forceExit = setTimeout(() => process.exit(1), 10_000);
+  await new Promise<void>((resolve, reject) => healthServer.close((err) => (err ? reject(err) : resolve())));
   await embeddingWorker.close();
   await pool.end();
   await redisConnection.quit();

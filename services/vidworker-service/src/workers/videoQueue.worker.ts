@@ -2,6 +2,7 @@ import { Worker } from 'bullmq';
 import { redisConnection } from '../config/redis.js';
 import { videoQueueProcessor } from '../processors/videoQueue.processor.js';
 import { QUEUES } from '@mediapro/queue';
+import { logger } from '../lib/logger.js';
 
 export const videoWorker = new Worker(QUEUES.VIDEO_PROCESSING, videoQueueProcessor, {
   connection: redisConnection,
@@ -12,13 +13,13 @@ export const videoWorker = new Worker(QUEUES.VIDEO_PROCESSING, videoQueueProcess
 });
 
 videoWorker.on('completed', (job, returnValue) => {
-  console.log(`[${job.id}] completed`, returnValue);
+  logger.info({ jobId: job.id, returnValue }, 'job completed');
 });
 
 videoWorker.on('failed', (job, err) => {
-  console.error(`[${job?.id}] failed: ${err.message}`);
+  logger.error({ jobId: job?.id, err }, 'job failed');
 });
 
 videoWorker.on('error', (err) => {
-  console.error('Worker error:', err);
+  logger.error({ err }, 'worker error');
 });

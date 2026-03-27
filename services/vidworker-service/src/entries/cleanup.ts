@@ -2,6 +2,8 @@ import { Queue } from 'bullmq';
 import { createOrphanCleanupWorker } from '../workers/orphanCleanup.worker.js';
 import { redisConnection } from '../config/redis.js';
 import { QUEUES, type VideoProcessingJob, type OrphanCleanupJob } from '@mediapro/queue';
+import { logger } from '../lib/logger.js';
+import { startHealthServer } from '../lib/health.js';
 
 const videoQueue = new Queue<VideoProcessingJob>(QUEUES.VIDEO_PROCESSING, { connection: redisConnection });
 const scheduler = new Queue<OrphanCleanupJob>(QUEUES.ORPHAN_CLEANUP, { connection: redisConnection });
@@ -13,11 +15,13 @@ await scheduler.upsertJobScheduler(
   { name: 'cleanup' },
 );
 
-console.log('Orphan cleanup worker started.');
+const healthServer = startHealthServer(redisConnection);
+logger.info('orphan cleanup worker started');
 
 async function shutdown() {
-  console.log('Shutting down orphan cleanup worker...');
+  logger.info('shutting down orphan cleanup worker');
   const forceExit = setTimeout(() => process.exit(1), 10_000);
+  await new Promise<void>((resolve, reject) => healthServer.close((err) => (err ? reject(err) : resolve())));
   await orphanCleanupWorker.close();
   await scheduler.close();
   await videoQueue.close();

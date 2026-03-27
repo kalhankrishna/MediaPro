@@ -3,6 +3,7 @@ import pg from 'pg';
 import { VideoStatus } from "@mediapro/proto";
 import { updateVideoStatus } from "../lib/vidMetadataService.js";
 import { type EmbeddingJob } from "@mediapro/queue";
+import { logger } from "../lib/logger.js";
 
 const CHUNK_SIZE = 400;
 const CHUNK_OVERLAP = 50;
@@ -78,7 +79,7 @@ export async function embeddingQueueProcessor(job: Job<EmbeddingJob>) {
 
         for (let i = 0; i < chunks.length; i++) {
         await client.query(
-            `INSERT INTO "VideoEmbedding" 
+            `INSERT INTO "VideoEmbedding"
             ("videoId", "transcriptId", "chunkIndex", "chunkText", "embedding", "startChar", "endChar")
             VALUES ($1, $2, $3, $4, $5::vector, $6, $7)`,
             [
@@ -100,11 +101,11 @@ export async function embeddingQueueProcessor(job: Job<EmbeddingJob>) {
         await updateVideoStatus({ videoId, status: VideoStatus.VIDEO_STATUS_COMPLETED });
 
         await job.updateProgress(100);
-        console.log(`[${job.id}] Embedding complete.`);
+        logger.info({ jobId: job.id }, 'embedding complete');
     }
     catch(err) {
         await client.query('ROLLBACK');
-        console.error(`[${job.id}] Embedding failed:`, err);
+        logger.error({ jobId: job.id, err }, 'embedding failed');
         await updateVideoStatus({ videoId, status: VideoStatus.VIDEO_STATUS_FAILED, errorMessage: err instanceof Error ? err.message : 'Unknown error' });
         throw err;
     }
