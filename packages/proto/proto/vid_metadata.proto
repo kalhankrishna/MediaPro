@@ -29,6 +29,7 @@ service VidMetadata {
   rpc UpdateVideoStatus (UpdateVideoStatusRequest) returns (UpdateVideoStatusResponse);
   rpc GetVideo (GetVideoRequest) returns (GetVideoResponse);
   rpc ListUserVideos (ListUserVideosRequest) returns (ListUserVideosResponse);
+  rpc ListVideosByStatus (ListVideosByStatusRequest) returns (ListVideosByStatusResponse);
   rpc CreateVideoFile (CreateVideoFileRequest) returns (CreateVideoFileResponse);
   rpc CreateTranscript (CreateTranscriptRequest) returns (CreateTranscriptResponse);
   rpc GetTranscript (GetTranscriptRequest) returns (GetTranscriptResponse);
@@ -252,4 +253,13 @@ message GetApiKeyByHashRequest {
 message GetApiKeyByHashResponse {
   string key_id = 1;
   string user_id = 2;
+}
+
+message ListVideosByStatusRequest {
+  VideoStatus status = 1;
+  google.protobuf.Timestamp created_before = 2;
+}
+
+message ListVideosByStatusResponse {
+  repeated Video videos = 1;
 }

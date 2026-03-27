@@ -2,6 +2,7 @@ export const QUEUES = {
   VIDEO_PROCESSING: 'video-processing',
   TRANSCRIPTION: 'transcription',
   EMBEDDING: 'embedding',
+  ORPHAN_CLEANUP: 'orphan-cleanup',
 } as const;
 
 export interface VideoProcessingJob {
@@ -19,3 +20,5 @@ export interface EmbeddingJob {
   transcriptId: string;
   transcriptText: string;
 }
+
+export interface OrphanCleanupJob {}

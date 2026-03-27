@@ -1,6 +1,6 @@
 import { promisify } from 'util';
 import { vidMetadataClient } from './grpcClient.js';
-import { UpdateVideoStatusRequest, CreateVideoFileRequest, CreateTranscriptRequest } from '@mediapro/proto';
+import { UpdateVideoStatusRequest, CreateVideoFileRequest, CreateTranscriptRequest, ListVideosByStatusRequest, type Video } from '@mediapro/proto';
 
 export const updateVideoStatus = promisify(
   vidMetadataClient.updateVideoStatus.bind(vidMetadataClient)
@@ -13,3 +13,7 @@ export const createVideoFile = promisify(
 export const createTranscript = promisify(
   vidMetadataClient.createTranscript.bind(vidMetadataClient)
 ) as (req: CreateTranscriptRequest) => Promise<{ transcriptId: string }>;
+
+export const listVideosByStatus = promisify(
+  vidMetadataClient.listVideosByStatus.bind(vidMetadataClient)
+) as (req: ListVideosByStatusRequest) => Promise<{ videos: Video[] }>;

@@ -1,5 +1,6 @@
 import { status as GrpcStatus } from "@grpc/grpc-js";
 import type { VidMetadataServer } from '@mediapro/proto';
+import { VideoStatus as ProtoVideoStatus } from '@mediapro/proto';
 import { prisma } from "../lib/prisma.js";
 import { Prisma } from "../generated/prisma/client.js";
 import { mapVideoStatusToPrisma, mapFileFormatToPrisma, mapVideoStatusToProto, mapFileFormatToProto } from '../lib/enumMappers.js';
@@ -135,6 +136,51 @@ export const vidMetadataHandlers: VidMetadataServer = {
         code: GrpcStatus.INTERNAL,
         message: (err as Error).message,
       }, null);
+    }
+  },
+
+  listVideosByStatus: async (call, callback) => {
+    try {
+      const { status, createdBefore } = call.request;
+
+      if (status === ProtoVideoStatus.VIDEO_STATUS_UNSPECIFIED) {
+        return callback({ code: GrpcStatus.INVALID_ARGUMENT, message: 'status must be specified' }, null);
+      }
+
+      const mappedStatus = mapVideoStatusToPrisma(status);
+
+      const videos = await prisma.video.findMany({
+        where: {
+          status: mappedStatus,
+          ...(createdBefore && { createdAt: { lt: createdBefore } }),
+        },
+        include: { files: true },
+        orderBy: { createdAt: 'asc' },
+      });
+
+      callback(null, {
+        videos: videos.map(video => ({
+          id: video.id,
+          userId: video.userId,
+          title: video.title,
+          errorMessage: video.errorMessage || undefined,
+          originalResolution: video.originalResolution,
+          duration: video.duration,
+          status: mapVideoStatusToProto(video.status),
+          createdAt: video.createdAt,
+          updatedAt: video.updatedAt,
+          completedAt: video.completedAt || undefined,
+          files: video.files.map(file => ({
+            id: file.id,
+            s3Key: file.s3Key,
+            fileSize: file.fileSize,
+            format: mapFileFormatToProto(file.format),
+            createdAt: file.createdAt,
+          })),
+        })),
+      });
+    } catch (err) {
+      callback({ code: GrpcStatus.INTERNAL, message: (err as Error).message }, null);
     }
   },
 
