@@ -9,15 +9,14 @@ export function registerUploadVideoTool(server: McpServer, gateway: GatewayClien
       title: 'Upload Video',
       description: 'Create a video record and get a presigned S3 URL to upload a video file directly.',
       inputSchema: {
-        userId: z.string().min(1).describe('The user ID'),
         title: z.string().min(1).describe('Video title'),
         originalResolution: z.string().describe('e.g. 1920x1080'),
         duration: z.number().int().positive().describe('Duration in seconds'),
         contentType: z.string().default('video/mp4').describe('MIME type of the video file'),
       },
     },
-    async ({ userId, title, originalResolution, duration, contentType }) => {
-      const { videoId } = await gateway.createVideo({ userId, title, originalResolution, duration });
+    async ({ title, originalResolution, duration, contentType }) => {
+      const { videoId } = await gateway.createVideo({ title, originalResolution, duration });
       const { url, key } = await gateway.getUploadUrl(videoId, contentType);
 
       return {

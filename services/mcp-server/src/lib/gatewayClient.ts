@@ -4,8 +4,8 @@ if (!GATEWAY_URL) throw new Error('GATEWAY_URL is not defined');
 export interface GatewayClient {
   search: (query: string) => Promise<{ answer: string; sources: any[] }>;
   getVideo: (videoId: string) => Promise<{ id: string; title: string; status: string; files: any[] }>;
-  listVideos: (userId: string) => Promise<{ videos: any[] }>;
-  createVideo: (payload: { userId: string; title: string; originalResolution: string; duration: number }) => Promise<{ videoId: string }>;
+  listVideos: () => Promise<{ videos: any[] }>;
+  createVideo: (payload: { title: string; originalResolution: string; duration: number }) => Promise<{ videoId: string }>;
   getUploadUrl: (videoId: string, contentType: string) => Promise<{ url: string; key: string }>;
   confirmUpload: (videoId: string) => Promise<{ message: string }>;
 }
@@ -44,11 +44,11 @@ export function createGatewayClient(authHeader?: string): GatewayClient {
     getVideo: (videoId) =>
       gatewayFetch(`/videos/${videoId}`),
 
-    listVideos: (userId) =>
-      gatewayFetch(`/videos?userId=${userId}`),
+    listVideos: () =>
+      gatewayFetch(`/videos/mcp`),
 
     createVideo: (payload) =>
-      gatewayFetch('/videos', {
+      gatewayFetch('/videos/mcp', {
         method: 'POST',
         body: JSON.stringify(payload),
       }),

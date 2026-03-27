@@ -5,7 +5,7 @@ import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { s3, S3_BUCKET } from '../lib/s3Client.js';
 import { videoQueue } from "../lib/queue.js";
 import { asyncHandler } from '../lib/asyncHandler.js';
-import { createVideoSchema, uploadUrlSchema, userIdQuerySchema, videoIdParamSchema } from '../schemas/videos.schema.js';
+import { createVideoSchema, createVideoSchemaMCP, uploadUrlSchema, userIdQuerySchema, videoIdParamSchema } from '../schemas/videos.schema.js';
 
 const router = Router();
 
@@ -14,6 +14,21 @@ router.get('/', asyncHandler(async (req, res) => {
     const { userId } = userIdQuerySchema.parse(req.query);
     const { videos } = await listUserVideos({ userId: userId as string });
     res.json({ videos });
+}));
+
+// GET /videos/mcp — auth middleware supplies userId via req.user
+router.get('/mcp', asyncHandler(async (req, res) => {
+    const userId = req.user?.userId as string;
+    const { videos } = await listUserVideos({ userId });
+    res.json({ videos });
+}));
+
+// POST /videos/mcp — auth middleware supplies userId via req.user
+router.post('/mcp', asyncHandler(async (req, res) => {
+    const userId = req.user?.userId as string;
+    const { title, originalResolution, duration } = createVideoSchemaMCP.parse(req.body);
+    const { videoId } = await createVideo({ userId, title, originalResolution, duration });
+    res.status(201).json({ videoId });
 }));
 
 // GET /videos/:videoId

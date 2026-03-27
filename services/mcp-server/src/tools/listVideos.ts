@@ -8,12 +8,9 @@ export function registerListVideosTool(server: McpServer, gateway: GatewayClient
     {
       title: 'List Videos',
       description: 'List all videos for a given user.',
-      inputSchema: {
-        userId: z.string().min(1).describe('The user ID'),
-      },
     },
-    async ({ userId }) => {
-      const result = await gateway.listVideos(userId);
+    async () => {
+      const result = await gateway.listVideos();
       return {
         content: [
           {

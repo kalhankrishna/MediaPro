@@ -7,6 +7,12 @@ export const createVideoSchema = z.object({
   duration: z.number().int().positive('Duration must be a positive integer'),
 });
 
+export const createVideoSchemaMCP = z.object({
+  title: z.string().min(1, 'Title is required'),
+  originalResolution: z.string().min(1, 'Original resolution is required'),
+  duration: z.number().int().positive('Duration must be a positive integer'),
+});
+
 export const uploadUrlSchema = z.object({
   contentType: z.string().min(1, 'Content type is required'),
 });
