@@ -1,9 +1,10 @@
 import { Request, Response, NextFunction } from "express";
 import { ZodError } from "zod";
+import logger from '../lib/logger.js';
 
-export const errorHandler = (error: Error, req: Request, res: Response, next: NextFunction) => {
+export const errorHandler = (error: Error, _req: Request, res: Response, _next: NextFunction) => {
     if (error instanceof ZodError) {
-        console.error('Error:', error);
+        logger.error({ err: error }, 'Validation error');
         res.status(400).json({
             error: 'Validation failed',
             details: error.issues.map(err => ({
@@ -14,6 +15,6 @@ export const errorHandler = (error: Error, req: Request, res: Response, next: Ne
         return;
     }
 
-    console.error('Error:', error);
+    logger.error({ err: error }, 'Unhandled error');
     res.status(500).json({error: "Internal server error"});
 }
