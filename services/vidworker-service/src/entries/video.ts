@@ -11,7 +11,9 @@ try {
   throw new Error('ffmpeg not found. Install via: winget install ffmpeg (Windows) or apt install ffmpeg (Linux)');
 }
 
-const healthServer = startHealthServer(redisConnection);
+const port = Number(process.env.VID_WORKER_HEALTH_PORT ?? '9100');
+
+const healthServer = startHealthServer(redisConnection, port);
 logger.info('video worker started, waiting for jobs');
 
 async function shutdown() {

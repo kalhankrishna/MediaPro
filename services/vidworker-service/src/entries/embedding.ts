@@ -4,7 +4,9 @@ import { redisConnection } from '../config/redis.js';
 import { logger } from '../lib/logger.js';
 import { startHealthServer } from '../lib/health.js';
 
-const healthServer = startHealthServer(redisConnection);
+const port = Number(process.env.EMBEDDING_WORKER_HEALTH_PORT ?? '9102');
+
+const healthServer = startHealthServer(redisConnection, port);
 logger.info('embedding worker started, waiting for jobs');
 
 async function shutdown() {

@@ -15,7 +15,9 @@ await scheduler.upsertJobScheduler(
   { name: 'cleanup' },
 );
 
-const healthServer = startHealthServer(redisConnection);
+const port = Number(process.env.CLEANUP_WORKER_HEALTH_PORT ?? '9103');
+
+const healthServer = startHealthServer(redisConnection, port);
 logger.info('orphan cleanup worker started');
 
 async function shutdown() {

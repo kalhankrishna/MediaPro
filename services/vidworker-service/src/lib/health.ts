@@ -2,9 +2,7 @@ import http from 'node:http';
 import type { Redis } from 'ioredis';
 import { logger } from './logger.js';
 
-export function startHealthServer(redis: Redis): http.Server {
-  const port = Number(process.env.HEALTH_PORT ?? '9100');
-
+export function startHealthServer(redis: Redis, port: number): http.Server {
   const server = http.createServer(async (req, res) => {
     if (req.method === 'GET' && req.url === '/health') {
       try {
