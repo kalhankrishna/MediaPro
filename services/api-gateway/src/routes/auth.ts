@@ -173,16 +173,16 @@ router.get('/github/callback', asyncHandler(async (req, res) => {
     expiresAt: refresh.expiresAt,
   });
 
-  res.cookie('access_token', accessToken, {
-    ...COOKIE_BASE,
-    maxAge: 15 * 60 * 1000, // 15 min
-  });
+  // res.cookie('access_token', accessToken, {
+  //   ...COOKIE_BASE,
+  //   maxAge: 15 * 60 * 1000, // 15 min
+  // });
 
-  res.cookie('refresh_token', refresh.raw, {
-    ...COOKIE_BASE,
-    path: '/auth', // only sent to auth endpoints
-    maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
-  });
+  // res.cookie('refresh_token', refresh.raw, {
+  //   ...COOKIE_BASE,
+  //   path: '/auth', // only sent to auth endpoints
+  //   maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+  // });
 
   res.redirect(`${FRONTEND_URL}/api/auth/callback?access_token=${accessToken}&refresh_token=${encodeURIComponent(refresh.raw)}`);
 }));
