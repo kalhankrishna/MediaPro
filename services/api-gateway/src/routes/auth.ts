@@ -184,7 +184,7 @@ router.get('/github/callback', asyncHandler(async (req, res) => {
     maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
   });
 
-  res.redirect(`${FRONTEND_URL}/dashboard`);
+  res.redirect(`${FRONTEND_URL}/api/auth/callback?access_token=${accessToken}&refresh_token=${encodeURIComponent(refresh.raw)}`);
 }));
 
 // ─── POST /auth/refresh ───
