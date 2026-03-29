@@ -5,7 +5,7 @@ const IS_PROD = process.env.NODE_ENV === 'production';
 const COOKIE_BASE = {
   httpOnly: true,
   secure: IS_PROD,
-  sameSite: 'lax' as const,
+  sameSite: 'none' as const,
 };
 
 export function GET(request: NextRequest): NextResponse {
