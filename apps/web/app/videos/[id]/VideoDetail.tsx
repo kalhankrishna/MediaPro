@@ -192,7 +192,7 @@ export default function VideoDetail({
 
   // Status polling — same tick-bump pattern as VideoList
   useEffect(() => {
-    if (TERMINAL.has(video.status)) {
+    if (video.status === COMPLETED) {
       setIsPolling(false);
       return;
     }
