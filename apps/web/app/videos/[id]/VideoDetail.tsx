@@ -1,9 +1,10 @@
 'use client';
 
-import { useEffect, useState, useRef, useCallback } from 'react';
+import { useEffect, useState, useRef, useCallback, useMemo } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import type { Video } from '@/lib/types';
+import { Download } from 'lucide-react';
+import type { Video, VideoFile } from '@/lib/types';
 import { STATUS, TERMINAL, COMPLETED, FAILED, StatusBadge } from '@/lib/videoStatus';
 import MetaRow from '@/app/components/MetaRow';
 
@@ -40,15 +41,8 @@ function formatDate(iso: string): string {
   });
 }
 
-function bestStreamFile(video: Video) {
-  const streamable = video.files
-    .map(f => ({ ...f, priority: FORMAT[f.format]?.streamPriority ?? 99 }))
-    .filter(f => f.priority < 99)
-    .sort((a, b) => a.priority - b.priority);
-  return streamable[0] ?? null;
-}
-
 interface Segment { start: number; end: number; text: string; }
+interface StreamFile { s3Key: string; label: string; }
 
 function toVttTime(seconds: number): string {
   const h = Math.floor(seconds / 3600);
@@ -96,18 +90,19 @@ function ProcessingState({ video }: { video: Video }) {
 
 function VideoPlayer({
   videoId,
-  s3Key,
+  streamFiles,
   transcript,
   segmentsJson,
   duration,
 }: {
   videoId: string;
-  s3Key: string;
+  streamFiles: StreamFile[];
   transcript: string | null;
   segmentsJson: string | null;
   duration: number;
 }) {
-  const [src, setSrc] = useState<string | null>(null);
+  const [urlMap, setUrlMap] = useState<Record<string, string>>({});
+  const [selectedKey, setSelectedKey] = useState<string>(streamFiles[0]?.s3Key ?? '');
   const [error, setError] = useState(false);
   const [vttUrl, setVttUrl] = useState<string | null>(null);
   const [statusMsg, setStatusMsg] = useState('');
@@ -120,22 +115,39 @@ function VideoPlayer({
     return () => URL.revokeObjectURL(url);
   }, [transcript, segmentsJson, duration]);
 
-  // Fetch presigned stream URL
+  // Prefetch presigned URLs for all quality levels on mount.
+  // Promise.allSettled so a single slow/failed fetch doesn't block the rest.
   useEffect(() => {
     let cancelled = false;
-    fetch(
-      `/api/videos/${encodeURIComponent(videoId)}/stream-url?key=${encodeURIComponent(s3Key)}`,
-      { cache: 'no-store' },
-    )
-      .then(r => r.ok ? r.json() : Promise.reject(r.status))
-      .then((data: { url: string }) => {
-        if (!cancelled) { setSrc(data.url); setStatusMsg('Video player ready.'); }
-      })
-      .catch(() => {
-        if (!cancelled) { setError(true); setStatusMsg('Failed to load video.'); }
-      });
+    setError(false);
+    Promise.allSettled(
+      streamFiles.map(async f => {
+        const r = await fetch(
+          `/api/videos/${encodeURIComponent(videoId)}/stream-url?key=${encodeURIComponent(f.s3Key)}`,
+          { cache: 'no-store' },
+        );
+        if (!r.ok) throw new Error(`${r.status}`);
+        const data: { url: string } = await r.json();
+        return [f.s3Key, data.url] as [string, string];
+      }),
+    ).then(results => {
+      if (cancelled) return;
+      const entries = results
+        .filter((r): r is PromiseFulfilledResult<[string, string]> => r.status === 'fulfilled')
+        .map(r => r.value);
+      if (entries.length === 0) {
+        setError(true);
+        setStatusMsg('Failed to load video.');
+      } else {
+        setUrlMap(Object.fromEntries(entries));
+        setStatusMsg('Video player ready.');
+      }
+    });
     return () => { cancelled = true; };
-  }, [videoId, s3Key]);
+  }, [videoId, streamFiles]);
+
+  const src = urlMap[selectedKey];
+  const hasMultiple = streamFiles.length > 1;
 
   return (
     <>
@@ -149,7 +161,7 @@ function VideoPlayer({
       )}
 
       {!src && !error && (
-        <div className="w-full aspect-video bg-zinc-900 border border-zinc-800 rounded-sm flex items-center justify-center">
+        <div className={`w-full aspect-video bg-zinc-900 border border-zinc-800 flex items-center justify-center ${hasMultiple ? 'rounded-t-sm border-b-0' : 'rounded-sm'}`}>
           <span className="font-mono text-[11px] text-zinc-500 motion-safe:animate-pulse">loading…</span>
         </div>
       )}
@@ -158,7 +170,7 @@ function VideoPlayer({
         <video
           key={src}
           controls
-          className="w-full aspect-video rounded-sm bg-black"
+          className={`w-full aspect-video bg-black ${hasMultiple ? 'rounded-t-sm' : 'rounded-sm'}`}
           preload="metadata"
         >
           <source src={src} />
@@ -166,6 +178,24 @@ function VideoPlayer({
           {vttUrl && <track kind="subtitles" src={vttUrl} label="Transcript" default />}
           Your browser does not support video playback.
         </video>
+      )}
+
+      {/* Quality selector — only shown when multiple encodings are available */}
+      {hasMultiple && !error && (
+        <div className="flex items-center gap-3 px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-b-sm">
+          <span className="font-mono text-[10px] uppercase tracking-widest text-zinc-500">quality</span>
+          <select
+            value={selectedKey}
+            onChange={e => setSelectedKey(e.target.value)}
+            disabled={Object.keys(urlMap).length === 0}
+            className="font-mono text-[11px] text-zinc-300 bg-zinc-950 border border-zinc-700 rounded-sm px-2 py-0.5 focus:outline-none focus:border-zinc-600 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+            aria-label="Video quality"
+          >
+            {streamFiles.map(f => (
+              <option key={f.s3Key} value={f.s3Key}>{f.label}</option>
+            ))}
+          </select>
+        </div>
       )}
     </>
   );
@@ -188,6 +218,7 @@ export default function VideoDetail({
   const [segmentsJson, setSegmentsJson] = useState<string | null>(initialSegmentsJson);
   const [tick, setTick] = useState(0);
   const [isPolling, setIsPolling] = useState(false);
+  const [downloadingIds, setDownloadingIds] = useState<Set<string>>(new Set());
   const transcriptFetchedRef = useRef(initialTranscript !== null);
 
   // Status polling — same tick-bump pattern as VideoList
@@ -240,7 +271,40 @@ export default function VideoDetail({
     if (video.status === COMPLETED) fetchTranscript();
   }, [video.status, fetchTranscript]);
 
-  const streamFile = bestStreamFile(video);
+  // All streamable encodings sorted highest quality first (1080p → 720p → 480p)
+  const streamFiles = useMemo<StreamFile[]>(() =>
+    video.files
+      .map(f => ({ ...f, priority: FORMAT[f.format]?.streamPriority ?? 99 }))
+      .filter(f => f.priority < 99)
+      .sort((a, b) => a.priority - b.priority)
+      .map(f => ({ s3Key: f.s3Key, label: FORMAT[f.format]!.label })),
+    [video.files],
+  );
+
+  async function handleDownload(f: VideoFile) {
+    if (downloadingIds.has(f.id)) return;
+    setDownloadingIds(prev => new Set(prev).add(f.id));
+    try {
+      const label = FORMAT[f.format]?.label ?? 'video';
+      const filename = `${video.title}-${label}.mp4`;
+      const res = await fetch(
+        `/api/videos/${encodeURIComponent(video.id)}/stream-url?key=${encodeURIComponent(f.s3Key)}&download=true&filename=${encodeURIComponent(filename)}`,
+        { cache: 'no-store' },
+      );
+      if (res.status === 401) { router.push('/login?error=session_expired'); return; }
+      if (!res.ok) return;
+      const { url } = (await res.json()) as { url: string };
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    } finally {
+      setDownloadingIds(prev => { const next = new Set(prev); next.delete(f.id); return next; });
+    }
+  }
+
   const isCompleted = video.status === COMPLETED;
   const isFailed = video.status === FAILED;
   const isInProgress = !TERMINAL.has(video.status);
@@ -273,12 +337,12 @@ export default function VideoDetail({
         </Link>
       </div>
 
-      {/* ── Video player (COMPLETED + streamable file exists) ── */}
-      {isCompleted && streamFile && (
+      {/* ── Video player (COMPLETED + streamable files exist) ── */}
+      {isCompleted && streamFiles.length > 0 && (
         <div className="mb-6">
           <VideoPlayer
             videoId={video.id}
-            s3Key={streamFile.s3Key}
+            streamFiles={streamFiles}
             transcript={transcript}
             segmentsJson={segmentsJson}
             duration={video.duration}
@@ -329,6 +393,7 @@ export default function VideoDetail({
           <div className="border border-zinc-800/70 rounded-sm">
             {video.files.map((f, i) => {
               const fmt = FORMAT[f.format];
+              const isDownloadable = fmt !== undefined && fmt.streamPriority < 99;
               return (
                 <div
                   key={f.id}
@@ -337,9 +402,24 @@ export default function VideoDetail({
                   <span className="font-mono text-[12px] text-zinc-300">
                     {fmt?.label ?? `format-${f.format}`}
                   </span>
-                  <span className="font-mono text-[11px] text-zinc-500">
-                    {formatBytes(Number(f.fileSize))}
-                  </span>
+                  <div className="flex items-center gap-3">
+                    <span className="font-mono text-[11px] text-zinc-500">
+                      {formatBytes(Number(f.fileSize))}
+                    </span>
+                    {isDownloadable && (
+                      <button
+                        onClick={() => handleDownload(f)}
+                        disabled={downloadingIds.has(f.id)}
+                        className="text-zinc-500 hover:text-zinc-300 transition-colors duration-100 disabled:opacity-40 flex items-center"
+                        aria-label={`Download ${fmt.label}`}
+                      >
+                        {downloadingIds.has(f.id)
+                          ? <span className="font-mono text-[10px]">…</span>
+                          : <Download size={13} />
+                        }
+                      </button>
+                    )}
+                  </div>
                 </div>
               );
             })}

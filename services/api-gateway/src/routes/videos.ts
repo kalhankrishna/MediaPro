@@ -63,13 +63,17 @@ router.post('/:videoId/upload-url', asyncHandler(async (req, res) => {
     res.json({ url, key });
 }));
 
-// GET /videos/:videoId/stream-url?key=<s3key>
+// GET /videos/:videoId/stream-url?key=<s3key>[&download=true&filename=<name>]
 // Generates a short-lived presigned GET URL. The key must be scoped to this
 // video (raw/{id}/…, processed/{id}/…, or assets/{id}/…) to prevent
-// cross-video access.
+// cross-video access. Pass download=true to force Content-Disposition: attachment.
 router.get('/:videoId/stream-url', asyncHandler(async (req, res) => {
     const { videoId } = videoIdParamSchema.parse(req.params);
     const key = req.query.key as string | undefined;
+    const isDownload = req.query.download === 'true';
+    const rawFilename = (req.query.filename as string | undefined) ?? 'video.mp4';
+    // Strip characters that would break the Content-Disposition header value
+    const safeFilename = rawFilename.replace(/["\\\r\n;/]/g, '_');
 
     if (!key) {
         res.status(400).json({ error: 'Missing key query parameter' });
@@ -82,7 +86,11 @@ router.get('/:videoId/stream-url', asyncHandler(async (req, res) => {
         return;
     }
 
-    const command = new GetObjectCommand({ Bucket: S3_BUCKET, Key: key });
+    const command = new GetObjectCommand({
+        Bucket: S3_BUCKET,
+        Key: key,
+        ...(isDownload && { ResponseContentDisposition: `attachment; filename="${safeFilename}"` }),
+    });
     const url = await getSignedUrl(s3, command, { expiresIn: 3600 });
     res.json({ url });
 }));

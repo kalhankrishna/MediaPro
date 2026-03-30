@@ -18,10 +18,16 @@ export async function GET(
     return NextResponse.json({ error: 'Missing key' }, { status: 400 });
   }
 
+  const qs = new URLSearchParams({ key });
+  const download = request.nextUrl.searchParams.get('download');
+  const filename = request.nextUrl.searchParams.get('filename');
+  if (download) qs.set('download', download);
+  if (filename) qs.set('filename', filename);
+
   let res: Response;
   try {
     res = await fetch(
-      `${GATEWAY_URL}/videos/${encodeURIComponent(id)}/stream-url?key=${encodeURIComponent(key)}`,
+      `${GATEWAY_URL}/videos/${encodeURIComponent(id)}/stream-url?${qs}`,
       {
         headers: { Cookie: `access_token=${accessToken}` },
         cache: 'no-store',
